@@ -1,7 +1,7 @@
 from tethys_sdk.routing import controller
 from tethys_sdk.gizmos import Button
 from .app import App
-
+from tethys_sdk.gizmos import MapView, MVView
 
 @controller
 def home(request):
@@ -64,12 +64,33 @@ def home(request):
         }
     )
 
+    map_view = MapView(
+        height='100%',
+        width='100%',
+        controls=[
+            'ZoomSlider', 'Rotate', 'FullScreen',
+            {'ZoomToExtent': {
+                'projection': 'EPSG:4326',
+                'extent': [-125, 24, -66, 50]
+            }}
+        ],
+        basemap=[
+            'CartoDB',
+            {'CartoDB': {'style': 'dark'}},
+            'OpenStreetMap',
+            'ESRI'
+        ],
+        view=MVView(
+            projection='EPSG:4326',
+            center=[-98,39],
+            zoom=5,
+            maxZoom=18,
+            minZoom=2
+        )
+    )
+
     context = {
-        'save_button': save_button,
-        'edit_button': edit_button,
-        'remove_button': remove_button,
-        'previous_button': previous_button,
-        'next_button': next_button
+        'map_view': map_view
     }
 
     return App.render(request, 'home.html', context)
