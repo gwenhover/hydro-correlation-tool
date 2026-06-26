@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tethysapp-hydro_correlation_tool"
+description =  "The Hydro Correlation Tool is a single-user scientific workbench for building and maintaining a high-quality cross-mapping table that links each active USGS streamflow gage to orresponding NWM v3 reach and GEOGLOWS v2 river."
+
+keywords = ["NWM", "GEOGLOWS", "USGS Gages"]
+authors = [
+    {name = "Gwen Hover", email = "ghover@aquaveo.com"},
+]
+classifiers = [
+     "Environment :: Web Environment",
+     "Framework :: Django",
+     "Intended Audience :: Developers",
+     "Operating System :: OS Independent",
+     "Programming Language :: Python",
+     "Programming Language :: Python :: 3",
+     "Programming Language :: Python :: 3.10",
+     "Topic :: Internet :: WWW/HTTP",
+     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+
+[tool.setuptools.package-data]
+"tethysapp.hydro_correlation_tool" = [
+    "templates/**/*",
+    "public/**/*",
+    "resources/**/*",
+    "workspaces/**/*"
+]
