@@ -22,9 +22,9 @@ class App(TethysAppBase):
         """
         custom_settings = (
             CustomSetting(
-                name='max_dams',
+                name='placeholder',
                 type=CustomSetting.TYPE_INTEGER,
-                description='Maximum number of dams that can be created in the app.',
+                description='placeholder.',
                 required=False
             ),
         )

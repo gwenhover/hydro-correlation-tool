@@ -22,10 +22,10 @@ def home(request):
             }}
         ],
         basemap=[
-            'CartoDB',
+            'ESRI',
             {'CartoDB': {'style': 'dark'}},
             'OpenStreetMap',
-            'ESRI'
+            'CartoDB'
         ],
         view=MVView(
             projection='EPSG:4326',
