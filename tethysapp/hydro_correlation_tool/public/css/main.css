@@ -1,3 +1,13 @@
 .map-row {
     height: 85vh;
 }
+
+.map-row > [class^="col"] {
+    height: 100%;
+}
+
+/* Tethys MapView gizmo wrapper divs */
+#map_view_outer_container,
+#map_view_outer_container > div {
+    height: 100%;
+}
