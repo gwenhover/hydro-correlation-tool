@@ -30,7 +30,7 @@ def home(request):
         view=MVView(
             projection='EPSG:4326',
             center=[-95,37.5],
-            zoom=5,
+            zoom=4.5,
             maxZoom=18,
             minZoom=2
         )

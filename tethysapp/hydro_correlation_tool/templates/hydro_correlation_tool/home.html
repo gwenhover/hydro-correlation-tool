@@ -8,7 +8,14 @@
 {% endblock %}
 
 {% block app_content %}
-  {% gizmo map_view %}
+  <div class="row map_row">
+    <div class="col-8">
+      {% gizmo map_view %}
+    </div>
+    <div class="col-4">
+      <p>panel goes here</p>
+    </div>
+  </div>
 {% endblock %}
 
 {# Use the after_app_content block for modals #}
