@@ -1,5 +1,11 @@
 {% extends tethys_app.package|add:"/base.html" %}
 {% load tethys %}
+{% load static %}
+
+{% block styles %}
+  {{ block.super }}
+  <link href="{% static tethys_app.package|add:'/css/main.css' %}" rel="stylesheet" />
+{% endblock %}
 
 {% block header_buttons %}
   <div class="header-button glyphicon-button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Help">
@@ -8,7 +14,7 @@
 {% endblock %}
 
 {% block app_content %}
-  <div class="row map_row">
+  <div class="row map-row">
     <div class="col-8">
       {% gizmo map_view %}
     </div>
