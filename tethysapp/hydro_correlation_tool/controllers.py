@@ -28,8 +28,13 @@ def home(request):
             'CartoDB'
         ],
         view=MVView(
-            projection='EPSG:4326',
-            center=[-95,37.5],
+            # Web Mercator (EPSG:3857) — the native projection of the basemap
+            # tiles and of the MapBox vector tiles used later for the stream
+            # networks. center is the CONUS midpoint [-95, 37.5] transformed
+            # into 3857 meters. JS (main.js) fits the view to the CONUS extent
+            # on load; this initial center/zoom just frames it before that runs.
+            projection='EPSG:3857',
+            center=[-10575351.63, 4509031.39],
             zoom=4.5,
             maxZoom=18,
             minZoom=2
