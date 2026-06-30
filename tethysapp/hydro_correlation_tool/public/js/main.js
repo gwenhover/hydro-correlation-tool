@@ -48,7 +48,7 @@ $(function() {
     // populating the panel is Week 4.
     ol_map.on('singleclick', function(evt) {
         ol_map.forEachFeatureAtPixel(evt.pixel, function(feature) {
-            console.log('Clicked gage:', feature.get('monitoring_location_id'));
+            console.log('Clicked gage:', feature.get('USGSID'));
             return true;
         });
     });
