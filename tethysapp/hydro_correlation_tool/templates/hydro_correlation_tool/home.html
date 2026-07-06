@@ -31,8 +31,48 @@
     <div class="col-8">
       {% gizmo map_view %}
     </div>
-    <div class="col-4">
-      <p>panel goes here</p>
+    <div class="col-4 panel">
+
+      {# Pinned controls — stay fixed while the detail area below scrolls #}
+      <div class="panel-controls">
+
+        <div class="control-group">
+          <label class="form-label">Network</label>
+          <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-primary" id="network-nwm">NWM</button>
+            {# GEOGLOWS disabled until Jerson delivers the CONUS tileset #}
+            <button type="button" class="btn btn-outline-primary" id="network-geoglows">GEOGLOWS</button>
+          </div>
+        </div>
+
+        {# --- Placeholders below: wired in later weeks --- #}
+        <div class="control-group">
+          <label class="form-label">Chart mode</label>
+          <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-outline-secondary" id="chart-single" disabled>Single</button>
+            <button type="button" class="btn btn-outline-secondary" id="chart-stacked" disabled>Stacked</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="form-label">Units</label>
+          <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-outline-secondary" id="unit-cms" disabled>cms</button>
+            <button type="button" class="btn btn-outline-secondary" id="unit-cfs" disabled>cfs</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <button type="button" class="btn btn-success w-100" id="export-csv" disabled>Export CSV</button>
+        </div>
+
+      </div>
+
+      {# Scrollable detail area — gage metadata + hydrograph land here later #}
+      <div class="panel-content">
+        <p class="text-muted">Select a gage to see details.</p>
+      </div>
+
     </div>
   </div>
 {% endblock %}

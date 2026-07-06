@@ -2,12 +2,31 @@
     height: 85vh;
 }
 
-.map-row > [class^="col"] {
+/* The panel is a vertical flex column filling the row's height, split into a
+   fixed control bar and a scrolling content area. */
+.panel {
     height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Tethys MapView gizmo wrapper divs */
-#map_view_outer_container,
-#map_view_outer_container > div {
-    height: 100%;
+/* flex: 0 0 auto = take natural height, never grow or shrink → stays pinned. */
+.panel-controls {
+    flex: 0 0 auto;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
 }
+
+/* flex: 1 1 auto = absorb the remaining height; min-height:0 lets it shrink
+   below its content so overflow-y can actually scroll (a flexbox gotcha). */
+.panel-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 0.5rem;
+}
+
+.control-group {
+    margin-bottom: 0.75rem;
+}
+

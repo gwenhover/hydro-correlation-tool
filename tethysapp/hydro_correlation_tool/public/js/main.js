@@ -61,6 +61,27 @@ $(function() {
     });
 
     ol_map.addLayer(nwm_layer);
+
+
+    $('#network-nwm').on('click', function() {
+        nwm_layer.setVisible(true);
+        // geoglows_layer.setVisible(false);
+
+        // Active button = solid (btn-primary); inactive = outline.
+        $('#network-nwm').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#network-geoglows').removeClass('btn-primary').addClass('btn-outline-primary');
+    });
+
+    $('#network-geoglows').on('click', function() {
+        nwm_layer.setVisible(false);
+        // geoglows_layer.setVisible(false);
+
+        // Active button = solid (btn-primary); inactive = outline.
+        $('#network-geoglows').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#network-nwm').removeClass('btn-primary').addClass('btn-outline-primary');
+    });
+
+
     // --- Click handling ----------------------------------------------------
 
     // On a map click, find the topmost gage feature under the cursor and log
