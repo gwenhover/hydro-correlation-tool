@@ -22,9 +22,9 @@ class App(TethysAppBase):
         """
         custom_settings = (
             CustomSetting(
-                name='placeholder',
-                type=CustomSetting.TYPE_INTEGER,
-                description='placeholder.',
+                name='MapBox PK Token',
+                type=CustomSetting.TYPE_STRING,
+                description='The key for the mapbox vector tiles.',
                 required=False
             ),
         )

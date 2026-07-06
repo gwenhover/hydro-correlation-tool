@@ -9,13 +9,14 @@
 
 
 {% block scripts %}
-  {{ block.super }}
-  {# Django resolves the static URL server-side; main.js reads this global. #}
+  {# Define page-specific globals BEFORE base.html's block.super loads main.js. #}
+  {# Django resolves the static URL / token server-side; main.js reads these. #}
   {# Swap the data file by changing only this one filename. #}
   <script type="text/javascript">
     var GAGES_GEOJSON_URL = "{% static tethys_app.package|add:'/data/merged_gages.geojson' %}";
+    var MAPBOX_TOKEN = "{{ mapbox_token }}";
   </script>
-  <script src="{% static tethys_app.package|add:'/js/main.js' %}" type="text/javascript"></script>
+  {{ block.super }}
 {% endblock %}
 
 

@@ -29,6 +29,9 @@ $(function() {
     // single color is correct for now.)
     var gage_layer = new ol.layer.Vector({
         source: gage_source,
+        // Higher zIndex keeps gages drawn on top of the stream lines, so the
+        // dots stay visible and win the click when a gage sits over a reach.
+        zIndex: 10,
         style: new ol.style.Style({
             image: new ol.style.Circle({
                 radius: 5,
@@ -40,6 +43,24 @@ $(function() {
 
     ol_map.addLayer(gage_layer);
 
+    var nwm_source = new ol.source.VectorTile({
+        format: new ol.format.MVT(),
+        // Tileset tops out at z16 (from Jerson's TileJSON), but the view allows
+        // zoom 18. maxZoom:16 makes OL over-zoom (reuse z16 tiles) past 16 rather
+        // than request z17/z18 tiles that don't exist and blank the streams.
+        maxZoom: 16,
+        url: 'https://{a-d}.tiles.mapbox.com/v4/byu-hydroinformatics.nwm-channels/{z}/{x}/{y}.vector.pbf?access_token=' + MAPBOX_TOKEN
+    });
+
+    var nwm_layer = new ol.layer.VectorTile({
+        source: nwm_source,
+        zIndex: 5,   // below gages (10), above basemap
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#3388ff', width: 1 })
+        })
+    });
+
+    ol_map.addLayer(nwm_layer);
     // --- Click handling ----------------------------------------------------
 
     // On a map click, find the topmost gage feature under the cursor and log
@@ -47,9 +68,32 @@ $(function() {
     // truthy value stops at the first hit. Week 2 stops at logging the id —
     // populating the panel is Week 4.
     ol_map.on('singleclick', function(evt) {
-        ol_map.forEachFeatureAtPixel(evt.pixel, function(feature) {
-            console.log('Clicked gage:', feature.get('USGSID'));
-            return true;
-        });
+        var gage = null;
+        var reach = null;
+
+        // Walk every feature under the click and keep the FIRST of each layer.
+        // The `=== null` guards dedupe: a second overlapping gage, or a reach
+        // split across vector-tile boundaries, won't get logged twice.
+        ol_map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
+            if (layer === gage_layer && gage === null) {
+                gage = feature;
+            } else if (layer === nwm_layer && reach === null) {
+                reach = feature;
+            }
+            // Stop early once we have one of each.
+            return gage !== null && reach !== null;
+        }, { hitTolerance: 5 });   // 1px stream lines are hard to hit exactly
+
+        if (gage !== null) {
+            console.log('Clicked gage:', gage.get('USGSID'));
+        }
+        if (reach !== null) {
+            // Confirms the NWM reach id + stream-order attribute are present on
+            // the tile features (Week 3 requirement; streamOrder feeds the Week 9
+            // headwater filter).
+            console.log('NWM reach station_id:', reach.get('station_id'),
+                        '| streamOrder:', reach.get('streamOrder'));
+        }
     });
+
 });
