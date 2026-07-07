@@ -27,18 +27,46 @@ $(function() {
     // The layer = HOW to draw the source. One flat-colored dot per gage.
     // (Color-by-verification-status comes in Week 7 once the DB exists — a
     // single color is correct for now.)
+    // Zoom-responsive gage styling: small dots when zoomed out (clean national
+    // overview), larger when zoomed in (easy click targets). Every gage stays
+    // visible and clickable — nothing is hidden by zoom.
+    var gageStyleCache = {};        // radius -> reusable Style (avoid rebuilding per feature)
+    var gageLastResolution = null;  // every feature in one frame shares a resolution...
+    var gageLastStyle = null;       // ...so memoize to skip recomputing ~9,000x per frame
+
+    function gageStyle(feature, resolution) {
+        // Fast path: same frame (same resolution) -> reuse the computed style.
+        if (resolution === gageLastResolution) {
+            return gageLastStyle;
+        }
+        var zoom = ol_map.getView().getZoomForResolution(resolution);
+
+        // Ramp radius from 3px (zoom <= 4) to 6px (zoom >= 11), clamped; round to
+        // 0.5 so only a handful of distinct Style objects are ever created.
+        var t = Math.max(0, Math.min(1, (zoom - 4) / (11 - 4)));
+        var radius = Math.round((3 + t * 3) * 2) / 2;
+
+        if (!gageStyleCache[radius]) {
+            gageStyleCache[radius] = new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: radius,
+                    fill: new ol.style.Fill({ color: '#1f78b4' }),
+                    stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
+                })
+            });
+        }
+
+        gageLastResolution = resolution;
+        gageLastStyle = gageStyleCache[radius];
+        return gageLastStyle;
+    }
+
     var gage_layer = new ol.layer.Vector({
         source: gage_source,
         // Higher zIndex keeps gages drawn on top of the stream lines, so the
         // dots stay visible and win the click when a gage sits over a reach.
         zIndex: 10,
-        style: new ol.style.Style({
-            image: new ol.style.Circle({
-                radius: 5,
-                fill: new ol.style.Fill({ color: '#1f78b4' }),
-                stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
-            })
-        })
+        style: gageStyle
     });
 
     ol_map.addLayer(gage_layer);
@@ -61,6 +89,23 @@ $(function() {
     });
 
     ol_map.addLayer(nwm_layer);
+
+    // --- Selected-gage highlight ring --------------------------------------
+    // A normally-empty layer holding only the currently-selected gage, drawn as
+    // a hollow ring above the gages. On each click we clear it and add the
+    // clicked gage, so the previous highlight is removed automatically.
+    var selection_source = new ol.source.Vector();
+    var selection_layer = new ol.layer.Vector({
+        source: selection_source,
+        zIndex: 20,   // above gages (zIndex 10) so the ring sits on top
+        style: new ol.style.Style({
+            image: new ol.style.Circle({
+                radius: 9,
+                stroke: new ol.style.Stroke({ color: '#00e5ff', width: 3 })
+            })
+        })
+    });
+    ol_map.addLayer(selection_layer);
 
 
     $('#network-nwm').on('click', function() {
@@ -119,8 +164,15 @@ $(function() {
                     '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
                 '</dl>'
             );
+
+            // Highlight this gage: clear the previous selection and add this one.
+            // A fresh Feature sharing the geometry avoids putting the same feature
+            // object into two sources.
+            selection_source.clear();
+            selection_source.addFeature(new ol.Feature(gage.getGeometry()));
         } else {
             $('.panel-content').html('<p class="text-muted">Select a gage to see details.</p>');
+            selection_source.clear();
         }
 
         if (reach !== null) {
