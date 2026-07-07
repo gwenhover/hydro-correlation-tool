@@ -106,8 +106,23 @@ $(function() {
         }, { hitTolerance: 5 });   // 1px stream lines are hard to hit exactly
 
         if (gage !== null) {
-            console.log('Clicked gage:', gage.get('USGSID'));
+            // The geometry is in EPSG:3857 (the map projection); toLonLat converts
+            // the coordinate back to [lon, lat] in 4326 for human-readable display —
+            // the same transform-at-the-display-boundary rule used everywhere else.
+            var lonLat = ol.proj.toLonLat(gage.getGeometry().getCoordinates());
+
+            $('.panel-content').html(
+                '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
+                '<dl class="gage-meta">' +
+                    '<dt>USGS ID</dt><dd>' + gage.get('USGSID') + '</dd>' +
+                    '<dt>Latitude</dt><dd>' + lonLat[1].toFixed(5) + '</dd>' +
+                    '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
+                '</dl>'
+            );
+        } else {
+            $('.panel-content').html('<p class="text-muted">Select a gage to see details.</p>');
         }
+
         if (reach !== null) {
             // Confirms the NWM reach id + stream-order attribute are present on
             // the tile features (Week 3 requirement; streamOrder feeds the Week 9

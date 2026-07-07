@@ -15,6 +15,8 @@
   <script type="text/javascript">
     var GAGES_GEOJSON_URL = "{% static tethys_app.package|add:'/data/merged_gages.geojson' %}";
     var MAPBOX_TOKEN = "{{ mapbox_token }}";
+    var GAGES_MD_URL = "{% url 'hydro_correlation_tool:get_gage_info' %}";
+
   </script>
   {{ block.super }}
 {% endblock %}

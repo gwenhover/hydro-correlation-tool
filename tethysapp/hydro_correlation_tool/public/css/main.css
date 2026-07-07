@@ -30,3 +30,29 @@
     margin-bottom: 0.75rem;
 }
 
+/* Selected-gage metadata block */
+.gage-name {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+/* Two-column grid: muted labels on the left, values on the right. */
+.gage-meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.75rem;
+    row-gap: 0.35rem;
+    margin: 0;
+}
+
+.gage-meta dt {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.gage-meta dd {
+    margin: 0;
+    font-size: 0.9rem;
+}
+

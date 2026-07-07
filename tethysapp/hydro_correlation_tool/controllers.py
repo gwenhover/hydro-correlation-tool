@@ -1,6 +1,7 @@
 from tethys_sdk.routing import controller
 from .app import App
 from tethys_sdk.gizmos import MapView, MVView
+from django.http import JsonResponse
 
 @controller
 def home(request):
@@ -46,5 +47,12 @@ def home(request):
         'mapbox_token': App.get_custom_setting('MapBox PK Token'),
     }
 
-
     return App.render(request, 'home.html', context)
+
+@controller(
+    name='get_gage_info',
+    url='gage-info',
+)
+def get_gage_info(request):
+    usgs_id = request.GET.get('usgs_id')
+    return JsonResponse({'usgs_id': usgs_id})
