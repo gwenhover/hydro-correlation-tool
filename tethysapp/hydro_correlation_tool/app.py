@@ -17,14 +17,17 @@ class App(TethysAppBase):
     feedback_emails = []
 
     def custom_settings(self):
-        """
-        Placeholder custom settings for when I add the MapBox token, headwater threshold, and data-API endpoints.
-        """
         custom_settings = (
             CustomSetting(
                 name='MapBox PK Token',
                 type=CustomSetting.TYPE_STRING,
                 description='The key for the mapbox vector tiles.',
+                required=False
+            ),
+            CustomSetting(
+                name='USGS API Token',
+                type=CustomSetting.TYPE_STRING,
+                description='The key for the USGS data.',
                 required=False
             ),
         )

@@ -177,14 +177,39 @@ $(function() {
             // the same transform-at-the-display-boundary rule used everywhere else.
             var lonLat = ol.proj.toLonLat(gage.getGeometry().getCoordinates());
 
+
             $('.panel-content').html(
                 '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
                 '<dl class="gage-meta">' +
                     '<dt>USGS ID</dt><dd>' + gage.get('USGSID') + '</dd>' +
                     '<dt>Latitude</dt><dd>' + lonLat[1].toFixed(5) + '</dd>' +
                     '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
-                '</dl>'
+                '</dl>' +
+                '<div id="hydrograph"></div>'
             );
+
+
+            $.get(GAGES_MD_URL, { usgs_id: gage.get('USGSID') }, function(data) {
+                if (data.dates.length === 0) {
+                    $('#hydrograph').html('<p class="text-muted">No discharge data for this gage.</p>');
+                    return;
+                }
+                
+                var traces = [{
+                    x: data.dates,
+                    y: data.values,
+                    type: 'scatter', 
+                    mode: 'lines',
+                    name: 'USGS Observed'
+                }];
+                var layout = {
+                    title: 'Observed daily discharge',
+                    xaxis: { title: 'Date' },
+                    yaxis: { title: 'Discharge (' + data.units + ')' }
+                };
+                Plotly.newPlot('hydrograph', traces, layout);
+
+            });
 
             // Highlight this gage: clear the previous selection and add this one.
             // A fresh Feature sharing the geometry avoids putting the same feature

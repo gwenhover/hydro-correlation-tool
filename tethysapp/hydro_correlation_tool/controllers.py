@@ -2,6 +2,7 @@ from tethys_sdk.routing import controller
 from .app import App
 from tethys_sdk.gizmos import MapView, MVView
 from django.http import JsonResponse
+from .fetchers import get_usgs_daily_discharge
 
 @controller
 def home(request):
@@ -55,4 +56,8 @@ def home(request):
 )
 def get_gage_info(request):
     usgs_id = request.GET.get('usgs_id')
-    return JsonResponse({'usgs_id': usgs_id})
+    gage_data = get_usgs_daily_discharge(
+        usgs_id, '2020-01-01', '2020-12-31',
+        api_key=App.get_custom_setting('USGS API Token'),
+    )
+    return JsonResponse(gage_data)

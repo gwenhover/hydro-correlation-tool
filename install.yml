@@ -13,6 +13,7 @@ requirements:
     packages:
 
   pip:
+    - dataretrieval
 
   npm:
 
