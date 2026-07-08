@@ -16,6 +16,7 @@
     var GAGES_GEOJSON_URL = "{% static tethys_app.package|add:'/data/merged_gages.geojson' %}";
     var MAPBOX_TOKEN = "{{ mapbox_token }}";
     var GAGES_MD_URL = "{% url 'hydro_correlation_tool:get_gage_info' %}";
+    var REACH_URL = "{% url 'hydro_correlation_tool:get_reach_info' %}";
   </script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   {{ block.super }}
@@ -42,7 +43,6 @@
           <label class="form-label">Network</label>
           <div class="btn-group w-100" role="group">
             <button type="button" class="btn btn-primary" id="network-nwm">NWM</button>
-            {# GEOGLOWS disabled until Jerson delivers the CONUS tileset #}
             <button type="button" class="btn btn-outline-primary" id="network-geoglows">GEOGLOWS</button>
           </div>
         </div>

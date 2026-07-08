@@ -2,7 +2,8 @@ from tethys_sdk.routing import controller
 from .app import App
 from tethys_sdk.gizmos import MapView, MVView
 from django.http import JsonResponse
-from .fetchers import get_usgs_daily_discharge
+from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective
+
 
 @controller
 def home(request):
@@ -61,3 +62,14 @@ def get_gage_info(request):
         api_key=App.get_custom_setting('USGS API Token'),
     )
     return JsonResponse(gage_data)
+
+@controller(
+    name='get_reach_info',
+    url='reach-info',
+)
+def get_reach_info(request):
+    river_id = request.GET.get('river_id')
+    reach_data = get_geoglows_retrospective(
+        river_id, '2020-01-01', '2020-12-31'
+    )
+    return JsonResponse(reach_data)

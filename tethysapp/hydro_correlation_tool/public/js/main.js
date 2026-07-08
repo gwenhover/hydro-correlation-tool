@@ -194,7 +194,7 @@ $(function() {
                     $('#hydrograph').html('<p class="text-muted">No discharge data for this gage.</p>');
                     return;
                 }
-                
+
                 var traces = [{
                     x: data.dates,
                     y: data.values,
@@ -222,11 +222,30 @@ $(function() {
         }
 
         if (reach !== null) {
-            // Confirms the NWM reach id + stream-order attribute are present on
-            // the tile features (Week 3 requirement; streamOrder feeds the Week 9
-            // headwater filter).
-            console.log('NWM reach station_id:', reach.get('station_id'),
-                        '| streamOrder:', reach.get('streamOrder'));
+            var network = null;
+
+            if (geoglows_layer.getVisible()) {
+                network = "GEOGLOWS";
+            } else {
+                network = "NWM"
+            }
+            $.get(REACH_URL, { river_id: reach.get('station_id'), network: network }, function(data) {
+                if (data.dates.length === 0) {
+                    return;
+                }
+                var values_cfs = data.values.map(function(v) { return v * 35.3147; });
+
+                // build the trace object
+                var trace = {
+                    x: data.dates,
+                    y: values_cfs,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: network
+                };
+                Plotly.addTraces('hydrograph', trace)
+
+            })
         }
     });
 
