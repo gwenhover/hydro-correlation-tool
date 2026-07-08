@@ -80,6 +80,15 @@ $(function() {
         url: 'https://{a-d}.tiles.mapbox.com/v4/byu-hydroinformatics.nwm-channels/{z}/{x}/{y}.vector.pbf?access_token=' + MAPBOX_TOKEN
     });
 
+    var geoglows_source = new ol.source.VectorTile({
+        format: new ol.format.MVT(),
+        // Tileset tops out at z12 (from Jerson's TileJSON), but the view allows
+        // zoom 18. maxZoom:12 makes OL over-zoom (reuse z12 tiles) past 12 rather
+        // than request z17/z18 tiles that don't exist and blank the streams.
+        maxZoom: 12,
+        url: 'https://{a-d}.tiles.mapbox.com/v4/byu-hydroinformatics.geoglows-us/{z}/{x}/{y}.vector.pbf?access_token=' + MAPBOX_TOKEN
+    });
+
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
         zIndex: 5,   // below gages (10), above basemap
@@ -88,7 +97,19 @@ $(function() {
         })
     });
 
+    var geoglows_layer = new ol.layer.VectorTile({
+        source: geoglows_source,
+        visible: false,
+        zIndex: 5,   // below gages (10), above basemap
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: '#020447', width: 1 })
+        })
+    });
+
     ol_map.addLayer(nwm_layer);
+
+    ol_map.addLayer(geoglows_layer);
+
 
     // --- Selected-gage highlight ring --------------------------------------
     // A normally-empty layer holding only the currently-selected gage, drawn as
@@ -110,7 +131,7 @@ $(function() {
 
     $('#network-nwm').on('click', function() {
         nwm_layer.setVisible(true);
-        // geoglows_layer.setVisible(false);
+        geoglows_layer.setVisible(false);
 
         // Active button = solid (btn-primary); inactive = outline.
         $('#network-nwm').removeClass('btn-outline-primary').addClass('btn-primary');
@@ -118,8 +139,8 @@ $(function() {
     });
 
     $('#network-geoglows').on('click', function() {
+        geoglows_layer.setVisible(true);
         nwm_layer.setVisible(false);
-        // geoglows_layer.setVisible(false);
 
         // Active button = solid (btn-primary); inactive = outline.
         $('#network-geoglows').removeClass('btn-outline-primary').addClass('btn-primary');
@@ -143,7 +164,7 @@ $(function() {
         ol_map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
             if (layer === gage_layer && gage === null) {
                 gage = feature;
-            } else if (layer === nwm_layer && reach === null) {
+            } else if ((layer === nwm_layer || layer === geoglows_layer) && reach === null) {
                 reach = feature;
             }
             // Stop early once we have one of each.
