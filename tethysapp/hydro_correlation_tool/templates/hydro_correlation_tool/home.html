@@ -5,6 +5,7 @@
 {% block styles %}
   {{ block.super }}
   <link href="{% static tethys_app.package|add:'/css/main.css' %}" rel="stylesheet" />
+  <link href="{% static tethys_app.package|add:'/vendor/driverjs/driver.css' %}" rel="stylesheet" />
 {% endblock %}
 
 
@@ -20,6 +21,9 @@
   </script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   {{ block.super }}
+  {# Guided tour — driver.js must load before tour.js #}
+  <script src="{% static tethys_app.package|add:'/vendor/driverjs/driver.js.iife.js' %}" type="text/javascript"></script>
+  <script src="{% static tethys_app.package|add:'/js/tour.js' %}" type="text/javascript"></script>
 {% endblock %}
 
 
@@ -39,7 +43,7 @@
       {# Pinned controls — stay fixed while the detail area below scrolls #}
       <div class="panel-controls">
 
-        <div class="control-group">
+        <div class="control-group" id="tour-network">
           <label class="form-label">Network</label>
           <div class="btn-group w-100" role="group">
             <button type="button" class="btn btn-primary" id="network-nwm">NWM</button>
@@ -48,7 +52,7 @@
         </div>
 
         {# --- Placeholders below: wired in later weeks --- #}
-        <div class="control-group">
+        <div class="control-group" id="tour-chart-mode">
           <label class="form-label">Chart mode</label>
           <div class="btn-group w-100" role="group">
             <button type="button" class="btn btn-primary" id="chart-single">Single</button>
@@ -56,7 +60,7 @@
           </div>
         </div>
 
-        <div class="control-group">
+        <div class="control-group" id="tour-units">
           <label class="form-label">Units</label>
           <div class="btn-group w-100" role="group">
             <button type="button" class="btn btn-primary" id="unit-cms">cms</button>
@@ -85,13 +89,14 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="help-modal-label">Help</h5>
+          <h5 class="modal-title w-100 text-center" id="help-modal-label">Welcome to the Hydro-Correlation Tool!</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p>Welcome to the Hydro-Correlation Tool. Use the map to explore USGS gages and their matching stream reaches.</p>
         </div>
         <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="window.HCT_START_TOUR()">Take the tour</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>

@@ -56,3 +56,36 @@
     font-size: 0.9rem;
 }
 
+
+/* Guided tour: driver.js caps popovers at 300px, which wraps our titles. */
+.driver-popover {
+    max-width: 400px;
+}
+
+/* The centered welcome step is a proper welcome card: wider, with a
+   guaranteed height and the nav buttons pinned to the bottom edge. The
+   anchored steps keep driver.js's compact default look.
+   NOTE: driver.js forces the popover's `display` via inline style, so this
+   must not rely on flex layout — the footer is pinned absolutely instead,
+   with bottom padding reserving its space. */
+.driver-popover.tour-welcome {
+    max-width: 520px;
+    min-height: 240px;
+    padding: 32px 36px 84px;
+}
+
+.driver-popover.tour-welcome .driver-popover-title {
+    font-size: 22px;
+    margin-bottom: 12px;
+}
+
+.driver-popover.tour-welcome .driver-popover-description {
+    font-size: 15px;
+}
+
+.driver-popover.tour-welcome .driver-popover-footer {
+    position: absolute;
+    left: 36px;
+    right: 36px;
+    bottom: 32px;
+}
