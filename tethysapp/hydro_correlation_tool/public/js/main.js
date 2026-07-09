@@ -128,7 +128,7 @@ $(function() {
     });
     ol_map.addLayer(selection_layer);
 
-
+    
     $('#network-nwm').on('click', function() {
         nwm_layer.setVisible(true);
         geoglows_layer.setVisible(false);
@@ -154,10 +154,13 @@ $(function() {
     // its id. forEachFeatureAtPixel walks features at that pixel; returning a
     // truthy value stops at the first hit. Week 2 stops at logging the id —
     // populating the panel is Week 4.
+
+    var series_state = {};
+    var current_unit = 'cms'
+
     ol_map.on('singleclick', function(evt) {
         var gage = null;
         var reach = null;
-
         // Walk every feature under the click and keep the FIRST of each layer.
         // The `=== null` guards dedupe: a second overlapping gage, or a reach
         // split across vector-tile boundaries, won't get logged twice.
@@ -176,7 +179,8 @@ $(function() {
             // the coordinate back to [lon, lat] in 4326 for human-readable display —
             // the same transform-at-the-display-boundary rule used everywhere else.
             var lonLat = ol.proj.toLonLat(gage.getGeometry().getCoordinates());
-
+            
+            series_state = {};
 
             $('.panel-content').html(
                 '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
@@ -195,28 +199,19 @@ $(function() {
                     return;
                 }
 
-                var traces = [{
-                    x: data.dates,
-                    y: data.values,
-                    type: 'scatter', 
-                    mode: 'lines',
-                    name: 'USGS Observed'
-                }];
-                var layout = {
-                    title: 'Observed daily discharge',
-                    xaxis: { title: 'Date' },
-                    yaxis: { title: 'Discharge (' + data.units + ')' }
-                };
-                Plotly.newPlot('hydrograph', traces, layout);
+                series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
+                render_hydrograph(current_unit);
 
             });
+
+            
 
             // Highlight this gage: clear the previous selection and add this one.
             // A fresh Feature sharing the geometry avoids putting the same feature
             // object into two sources.
             selection_source.clear();
             selection_source.addFeature(new ol.Feature(gage.getGeometry()));
-        } else {
+        } else if (reach === null) {
             $('.panel-content').html('<p class="text-muted">Select a gage to see details.</p>');
             selection_source.clear();
         }
@@ -233,20 +228,50 @@ $(function() {
                 if (data.dates.length === 0) {
                     return;
                 }
-                var values_cfs = data.values.map(function(v) { return v * 35.3147; });
+                
+                series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+                render_hydrograph(current_unit);
 
-                // build the trace object
-                var trace = {
-                    x: data.dates,
-                    y: values_cfs,
-                    type: 'scatter',
-                    mode: 'lines',
-                    name: network
-                };
-                Plotly.addTraces('hydrograph', trace)
+            });
+        };
+    });
 
-            })
+    function render_hydrograph(unit) {
+        if (Object.keys(series_state).length === 0) {
+            return;
         }
+        var factor = (unit === 'cfs') ? 35.3147 : 1;
+        var traces = Object.values(series_state).map(function(s) {
+            return {
+                x: s.dates,
+                y: s.values.map(function(v){return v * factor;}),
+                type: 'scatter',
+                mode: 'lines',
+                name: s.name
+            }
+            
+        });
+        var layout = {
+            title: 'Observed daily discharge',
+            xaxis: { title: 'Date' },
+            yaxis: { title: 'Discharge (' + unit + ')' }
+        };
+
+        Plotly.react('hydrograph', traces, layout)
+    }
+
+    $('#unit-cms').on('click', function() {
+        current_unit = 'cms';
+        render_hydrograph(current_unit);
+        $('#unit-cms').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#unit-cfs').removeClass('btn-primary').addClass('btn-outline-primary');
+    });
+
+    $('#unit-cfs').on('click', function() {
+        current_unit = 'cfs';
+        render_hydrograph(current_unit);
+        $('#unit-cfs').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#unit-cms').removeClass('btn-primary').addClass('btn-outline-primary');
     });
 
 });

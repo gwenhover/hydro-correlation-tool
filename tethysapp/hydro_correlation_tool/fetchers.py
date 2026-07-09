@@ -23,8 +23,8 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
 
     return {
         "dates": data["time"].dt.strftime("%Y-%m-%d").tolist(),
-        "values": data["value"].tolist(),
-        "units": data["unit_of_measure"].iloc[0]
+        "values": (data["value"] * 0.0283168).tolist(),
+        "units": "m^3/s"
     }
     
     

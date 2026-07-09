@@ -69,7 +69,11 @@ def get_gage_info(request):
 )
 def get_reach_info(request):
     river_id = request.GET.get('river_id')
-    reach_data = get_geoglows_retrospective(
-        river_id, '2020-01-01', '2020-12-31'
-    )
+    network = request.GET.get('network')
+    if network == 'GEOGLOWS':
+        reach_data = get_geoglows_retrospective(
+            river_id, '2020-01-01', '2020-12-31'
+        )
+    else:
+        reach_data = {'placeholder': []}
     return JsonResponse(reach_data)
