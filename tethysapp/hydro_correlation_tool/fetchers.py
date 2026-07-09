@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 import geoglows
 from dataretrieval import waterdata
 
@@ -28,9 +29,42 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
     }
     
     
+# Lazily-opened, module-lifetime handle to the GEOGLOWS daily retrospective
+# zarr on S3. format='xarray' returns a lazy (dask-backed) view of the whole
+# dataset without downloading it; each per-river select below then pulls only
+# the few chunks that river needs (~0.2-1s) instead of the full record (~4s
+# for the hourly product the old code fetched). Opening costs ~1.5s, so pay
+# it once on the first click, not on every click.
+_geoglows_daily_ds = None
+
+def _get_geoglows_daily_ds():
+    global _geoglows_daily_ds
+    if _geoglows_daily_ds is None:
+        _geoglows_daily_ds = geoglows.data.retro_daily(format="xarray")
+    return _geoglows_daily_ds
+
+
+@lru_cache(maxsize=128)
+def _geoglows_daily_series(river_id, start, end):
+    # Returns immutable tuples so cached results can't be mutated by callers.
+    # lru_cache only caches successes (exceptions propagate uncached), so a
+    # transient network failure doesn't poison the cache for that river.
+    series = (
+        _get_geoglows_daily_ds()["Q"]
+        .sel(river_id=river_id)
+        .sel(time=slice(start, end))
+        .to_series()
+        .dropna()
+    )
+    return (
+        tuple(series.index.strftime("%Y-%m-%d")),
+        tuple(float(v) for v in series),
+    )
+
+
 def get_geoglows_retrospective(river_id, start, end):
     try:
-        df = geoglows.data.retrospective(int(river_id))
+        dates, values = _geoglows_daily_series(int(river_id), start, end)
     except Exception as e:
         # bad/unknown river_id, network error, AWS down, etc. Log it, then
         # return the same empty shape as the USGS fetcher so the front end
@@ -38,17 +72,8 @@ def get_geoglows_retrospective(river_id, start, end):
         print("GEOGLOWS retrospective fetch failed:", repr(e))
         return {"dates": [], "values": [], "units": None}
 
-    if df is None or df.empty:
-        return {"dates": [], "values": [], "units": None}
-
-    # Hourly since 1940 -> daily means, then take the single value column
-    # (named after the river_id, so select by position: scalar 0 -> Series)
-    # and slice to the requested window by date label.
-    daily = df.resample("D").mean()
-    series = daily.iloc[:, 0].loc[start:end]
-
     return {
-        "dates": series.index.strftime("%Y-%m-%d").tolist(),
-        "values": series.tolist(),
+        "dates": list(dates),
+        "values": list(values),
         "units": "m^3/s",   # GEOGLOWS is always cms; no units column to read
     }
