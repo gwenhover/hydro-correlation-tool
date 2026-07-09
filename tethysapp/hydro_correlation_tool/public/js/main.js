@@ -150,13 +150,20 @@ $(function() {
 
     // --- Click handling ----------------------------------------------------
 
-    // On a map click, find the topmost gage feature under the cursor and log
-    // its id. forEachFeatureAtPixel walks features at that pixel; returning a
-    // truthy value stops at the first hit. Week 2 stops at logging the id —
-    // populating the panel is Week 4.
+    // On a map click, find the gage and/or reach under the cursor. A gage
+    // click rebuilds the panel (metadata + hydrograph divs) and fetches the
+    // USGS series; a reach click fetches the model series and overlays it on
+    // the current gage's hydrograph; a click on neither clears the selection.
 
     var series_state = {};
     var current_unit = 'cms'
+    var current_chart = 'single'
+
+    // Bumped every time series_state is reset (new gage selected, or selection
+    // cleared). Each $.get captures the value at request time; if it changed by
+    // the time the response lands, that response belongs to a previous selection
+    // and is dropped instead of drawn under the wrong gage's metadata.
+    var selection_generation = 0;
 
     ol_map.on('singleclick', function(evt) {
         var gage = null;
@@ -179,8 +186,9 @@ $(function() {
             // the coordinate back to [lon, lat] in 4326 for human-readable display —
             // the same transform-at-the-display-boundary rule used everywhere else.
             var lonLat = ol.proj.toLonLat(gage.getGeometry().getCoordinates());
-            
+
             series_state = {};
+            selection_generation += 1;
 
             $('.panel-content').html(
                 '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
@@ -189,18 +197,26 @@ $(function() {
                     '<dt>Latitude</dt><dd>' + lonLat[1].toFixed(5) + '</dd>' +
                     '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
                 '</dl>' +
-                '<div id="hydrograph"></div>'
+                '<div id="hydrograph-1"></div>' +
+                '<div id="hydrograph-2"></div>' +
+                '<div id="hydrograph-3"></div>'
             );
 
 
+            // Capture the generation this request belongs to; the callback
+            // compares it against the current one and drops stale responses.
+            var gage_generation = selection_generation;
             $.get(GAGES_MD_URL, { usgs_id: gage.get('USGSID') }, function(data) {
+                if (gage_generation !== selection_generation) {
+                    return;   // user has since selected a different gage (or cleared)
+                }
                 if (data.dates.length === 0) {
-                    $('#hydrograph').html('<p class="text-muted">No discharge data for this gage.</p>');
+                    $('#hydrograph-1').html('<p class="text-muted">No discharge data for this gage.</p>');
                     return;
                 }
 
                 series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
-                render_hydrograph(current_unit);
+                render_hydrograph();
 
             });
 
@@ -214,6 +230,10 @@ $(function() {
         } else if (reach === null) {
             $('.panel-content').html('<p class="text-muted">Select a gage to see details.</p>');
             selection_source.clear();
+            // Reset the series too — the hydrograph divs are gone from the DOM,
+            // and bumping the generation invalidates any in-flight requests.
+            series_state = {};
+            selection_generation += 1;
         }
 
         if (reach !== null) {
@@ -224,23 +244,37 @@ $(function() {
             } else {
                 network = "NWM"
             }
+            // Same staleness guard as the gage request: this reach series
+            // belongs to the currently-selected gage, so drop the response if
+            // the selection has changed by the time it arrives.
+            var reach_generation = selection_generation;
             $.get(REACH_URL, { river_id: reach.get('station_id'), network: network }, function(data) {
+                if (reach_generation !== selection_generation) {
+                    return;
+                }
                 if (data.dates.length === 0) {
                     return;
                 }
-                
+
                 series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
-                render_hydrograph(current_unit);
+                render_hydrograph();
 
             });
         };
     });
 
-    function render_hydrograph(unit) {
+    function render_hydrograph() {
         if (Object.keys(series_state).length === 0) {
             return;
         }
-        var factor = (unit === 'cfs') ? 35.3147 : 1;
+        // The hydrograph divs only exist after a gage click rebuilds the panel.
+        // Without a selected gage (e.g. a reach clicked on its own) there is
+        // nowhere to draw — Plotly.react on a missing div throws.
+        if (document.getElementById('hydrograph-1') === null) {
+            return;
+        }
+        var factor = (current_unit === 'cfs') ? 35.3147 : 1;
+
         var traces = Object.values(series_state).map(function(s) {
             return {
                 x: s.dates,
@@ -249,29 +283,87 @@ $(function() {
                 mode: 'lines',
                 name: s.name
             }
-            
         });
-        var layout = {
-            title: 'Observed daily discharge',
-            xaxis: { title: 'Date' },
-            yaxis: { title: 'Discharge (' + unit + ')' }
-        };
 
-        Plotly.react('hydrograph', traces, layout)
-    }
+        // The three fixed divs are always in the DOM; `used_count` records how
+        // many this render actually draws into, so we can blank the rest below.
+        var chart_ids = ['hydrograph-1', 'hydrograph-2', 'hydrograph-3'];
+        var used_count;
+
+        if (current_chart === 'single') {
+            var layout = {
+                title: 'Observed and Forecast Data',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Discharge (' + current_unit + ')' }
+            };
+
+            Plotly.react('hydrograph-1', traces, layout);
+            used_count = 1;                 // single mode draws into the first div only
+
+        } else {
+            // Stacked mode: one chart per series, all sharing a common y-axis
+            // range so magnitudes are directly comparable — a wrong reach shows
+            // up as an obvious over/under-shoot instead of being hidden by
+            // per-chart auto-scaling. Reuse the traces built above (already in
+            // the current unit) and recompute the range every render so it
+            // tracks the unit toggle and whichever series are loaded.
+            var y_max = traces.reduce(function(max, t) {
+                return t.y.reduce(function(m, v) {
+                    return (isFinite(v) && v > m) ? v : m;
+                }, max);
+            }, 0);
+
+            traces.forEach(function(trace, i) {
+                var layout = {
+                    title: trace.name,
+                    xaxis: { title: 'Date' },
+                    yaxis: { title: 'Discharge (' + current_unit + ')' }
+                };
+                // Share the scale only when there's a real positive peak; a
+                // [0, 0] range would be degenerate, so fall back to auto then.
+                if (y_max > 0) {
+                    layout.yaxis.range = [0, y_max * 1.05];   // 5% headroom
+                }
+                Plotly.react(chart_ids[i], [trace], layout);
+            });
+            used_count = traces.length;     // stacked draws one div per series
+        }
+
+        // Clear any divs we didn't draw into this render, so an old chart doesn't
+        // linger — e.g. switching stacked -> single, or loading a gage that has
+        // fewer series than the last one. purge() empties a div, and is a safe
+        // no-op on a div that was never plotted.
+        chart_ids.slice(used_count).forEach(function(id) {
+            Plotly.purge(id);
+        });
+    };
 
     $('#unit-cms').on('click', function() {
         current_unit = 'cms';
-        render_hydrograph(current_unit);
+        render_hydrograph();
         $('#unit-cms').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#unit-cfs').removeClass('btn-primary').addClass('btn-outline-primary');
     });
 
     $('#unit-cfs').on('click', function() {
         current_unit = 'cfs';
-        render_hydrograph(current_unit);
+        render_hydrograph();
         $('#unit-cfs').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#unit-cms').removeClass('btn-primary').addClass('btn-outline-primary');
     });
+
+    $('#chart-single').on('click', function() {
+        current_chart = 'single';
+        render_hydrograph();
+        $('#chart-single').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#chart-stacked').removeClass('btn-primary').addClass('btn-outline-primary');
+    });
+
+    $('#chart-stacked').on('click', function() {
+        current_chart = 'stacked';
+        render_hydrograph();
+        $('#chart-stacked').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#chart-single').removeClass('btn-primary').addClass('btn-outline-primary');
+    })
 
 });
