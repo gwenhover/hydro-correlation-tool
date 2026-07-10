@@ -197,6 +197,10 @@ $(function() {
                     '<dt>Latitude</dt><dd>' + lonLat[1].toFixed(5) + '</dd>' +
                     '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
                 '</dl>' +
+                // Message div is separate from the chart divs: the gage and reach
+                // callbacks race, and a "no data" note must be able to coexist
+                // with a chart (e.g. gage without records sitting on a live reach).
+                '<div id="hydrograph-msg"></div>' +
                 '<div id="hydrograph-1"></div>' +
                 '<div id="hydrograph-2"></div>' +
                 '<div id="hydrograph-3"></div>'
@@ -211,7 +215,7 @@ $(function() {
                     return;   // user has since selected a different gage (or cleared)
                 }
                 if (data.dates.length === 0) {
-                    $('#hydrograph-1').html('<p class="text-muted">No discharge data for this gage.</p>');
+                    $('#hydrograph-msg').html('<p class="text-muted">No observed discharge data for this gage.</p>');
                     return;
                 }
 
@@ -292,7 +296,9 @@ $(function() {
 
         if (current_chart === 'single') {
             var layout = {
-                title: 'Observed and Forecast Data',
+                // Title names exactly the series drawn — a reach-only chart says
+                // "GEOGLOWS", a full comparison says "USGS Observed vs GEOGLOWS".
+                title: traces.map(function(t) { return t.name; }).join(' vs '),
                 xaxis: { title: 'Date' },
                 yaxis: { title: 'Discharge (' + current_unit + ')' }
             };
