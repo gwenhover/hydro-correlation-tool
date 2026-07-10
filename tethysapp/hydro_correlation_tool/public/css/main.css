@@ -12,9 +12,19 @@
 
 /* flex: 0 0 auto = take natural height, never grow or shrink → stays pinned. */
 .panel-controls {
-    flex: 0 0 auto;
-    padding-bottom: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    border-top: 1px solid #dee2e6;
     border-bottom: 1px solid #dee2e6;
+}
+
+.panel-controls .btn {
+    --bs-btn-padding-y: 0.15rem;
+    --bs-btn-padding-x: 0.2rem;   /* default 0.5rem starves narrow buttons (GEOGLOWS) */
+    --bs-btn-font-size: 0.8rem;
 }
 
 /* flex: 1 1 auto = absorb the remaining height; min-height:0 lets it shrink
@@ -27,8 +37,31 @@
 }
 
 .control-group {
-    margin-bottom: 0.75rem;
+    flex: 1 1 0;
+    margin-bottom: 0;
+    min-width: 0;
 }
+
+/* The Network group hosts the longest word (GEOGLOWS) — give it a slightly
+   larger share so the text fits; the other two columns split the rest. */
+.control-group:first-child {
+    flex-grow: 1.35;
+}
+
+.control-group:last-child {
+    flex: 1 1 100%;    /* base width = whole row -> forced onto its own line */
+}
+
+.control-group .form-label {
+    margin-bottom: 0;    /* kill Bootstrap's below-label gap, useless in a row */
+    font-size: 0.85rem;
+}
+
+.control-group .btn-group .btn {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
 
 /* Selected-gage metadata block */
 .gage-name {
@@ -64,14 +97,13 @@
 
 /* The centered welcome step is a proper welcome card: wider, with a
    guaranteed height and the nav buttons pinned to the bottom edge. The
-   anchored steps keep driver.js's compact default look.
-   NOTE: driver.js forces the popover's `display` via inline style, so this
-   must not rely on flex layout — the footer is pinned absolutely instead,
-   with bottom padding reserving its space. */
+   anchored steps keep driver.js's compact default look. */
 .driver-popover.tour-welcome {
     max-width: 520px;
     min-height: 240px;
-    padding: 32px 36px 84px;
+    padding: 32px 36px;
+    display: flex;
+    flex-direction: column;
 }
 
 .driver-popover.tour-welcome .driver-popover-title {
@@ -83,9 +115,9 @@
     font-size: 15px;
 }
 
+/* margin-top: auto pushes the footer to the card's bottom, so the
+   min-height turns into visible breathing room instead of empty bottom. */
 .driver-popover.tour-welcome .driver-popover-footer {
-    position: absolute;
-    left: 36px;
-    right: 36px;
-    bottom: 32px;
+    margin-top: auto;
+    padding-top: 20px;
 }
