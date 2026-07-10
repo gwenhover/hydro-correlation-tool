@@ -3,3 +3,9 @@ __pycache__/
 *.pyo
 *:Zone.Identifier
 *.egg-info/
+
+# GEOGLOWS hydrofabric downloads (multi-GB, re-fetchable from public S3)
+preprocessing/geoglows_hydrography/
+
+# Personal learning notebooks — not part of the deliverable
+preprocessing/learning*.ipynb
