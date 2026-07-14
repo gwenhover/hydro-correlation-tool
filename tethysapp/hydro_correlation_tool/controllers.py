@@ -2,7 +2,7 @@ from tethys_sdk.routing import controller
 from .app import App
 from tethys_sdk.gizmos import MapView, MVView
 from django.http import JsonResponse
-from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective
+from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective, get_nwm_retrospective
 
 
 @controller
@@ -75,5 +75,7 @@ def get_reach_info(request):
             river_id, '2020-01-01', '2020-12-31'
         )
     else:
-        reach_data = {'placeholder': []}
+        reach_data = get_nwm_retrospective(
+            river_id, '2020-01-01', '2020-12-31', api_key=App.get_custom_setting('NWM API Token')
+        )
     return JsonResponse(reach_data)

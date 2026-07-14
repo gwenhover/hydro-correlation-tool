@@ -2,6 +2,9 @@ import os
 from functools import lru_cache
 import geoglows
 from dataretrieval import waterdata
+import requests
+import pandas as pd
+import io
 
 def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
     if api_key:
@@ -36,6 +39,8 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
 # for the hourly product the old code fetched). Opening costs ~1.5s, so pay
 # it once on the first click, not on every click.
 _geoglows_daily_ds = None
+NWM_URL = "https://nwm-api-v2-9f6idmxh.uc.gateway.dev/retrospectives"
+
 
 def _get_geoglows_daily_ds():
     global _geoglows_daily_ds
@@ -77,3 +82,45 @@ def get_geoglows_retrospective(river_id, start, end):
         "values": list(values),
         "units": "m^3/s",   # GEOGLOWS is always cms; no units column to read
     }
+    
+    
+@lru_cache(maxsize=128)
+def _nwm_daily_series(river_id, start, end, api_key):
+    # Returns immutable tuples so cached results can't be mutated by callers.
+    # lru_cache only caches successes (exceptions propagate uncached), so a
+    # transient network failure doesn't poison the cache for that river.
+    nwm_params = {
+        'reach_id': river_id,
+        'start_time': start,
+        'end_time': end,
+        'output_format': 'csv'}
+    
+    r=requests.get(NWM_URL,
+                       params=nwm_params,
+                       headers={'x-api-key': api_key},
+                       timeout=60)
+    r.raise_for_status()
+    df = pd.read_csv(io.StringIO(r.text))
+    df["time"] = pd.to_datetime(df["time"])
+    daily = df.set_index("time")["streamflow"].resample("D").mean().dropna()
+    
+    return (
+        tuple(daily.index.strftime("%Y-%m-%d")),
+        tuple(daily),
+    )
+def get_nwm_retrospective(river_id, start, end, api_key):
+
+    try: 
+        dates, daily = _nwm_daily_series(river_id, start, end, api_key)
+        
+        return {"dates": list(dates), "values": list(daily), "units": "m^3/s"}
+    
+    except Exception as e:
+        print("NWM retrospective fetch failed:", repr(e))
+        return {"dates": [], "values": [], "units": None}
+        
+        
+
+        
+        
+        

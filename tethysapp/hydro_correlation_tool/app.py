@@ -30,5 +30,11 @@ class App(TethysAppBase):
                 description='The key for the USGS data.',
                 required=False
             ),
+            CustomSetting(
+                name='NWM API Token',
+                type=CustomSetting.TYPE_STRING,
+                description='The key for the NWM API',
+                required=False
+            ),
         )
         return custom_settings
