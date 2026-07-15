@@ -31,6 +31,15 @@
       },
     },
     {
+      element: ".toggle-nav",
+      popover: {
+        title: "Workflow",
+        description:
+        "Click here to open the instructions panel, which walks through the workflow.",
+        side: "bottom",
+      },
+    },
+    {
       element: ".map-row .col-8",
       popover: {
         title: "The map",

@@ -130,7 +130,7 @@
     justify-content: center;     /* ...and horizontally */
     background-color: #1a5276;   /* filled circle, like the 4.3 mockup */
     color: #fff;
-    font-size: 0.8rem;
+    font-size: 12px;
     font-weight: 600;
     flex-shrink: 0;              /* don't let the circle squish when text is long */
 
