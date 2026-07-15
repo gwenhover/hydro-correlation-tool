@@ -248,6 +248,12 @@ $(function() {
             } else {
                 network = "NWM"
             }
+            var net_class = 'reach-row-' + network.toLowerCase();
+            $('.' + net_class).remove();
+            $('.gage-meta').append(
+                '<dt class="' + net_class + '">' + network + ' Reach ID</dt>' +
+                '<dd class="' + net_class + '">' + reach.get('station_id') + '</dd>'
+            )
             // Same staleness guard as the gage request: this reach series
             // belongs to the currently-selected gage, so drop the response if
             // the selection has changed by the time it arrives.
