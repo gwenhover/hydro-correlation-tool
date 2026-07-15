@@ -46,6 +46,9 @@ def _get_geoglows_daily_ds():
     global _geoglows_daily_ds
     if _geoglows_daily_ds is None:
         _geoglows_daily_ds = geoglows.data.retro_daily(format="xarray")
+        _geoglows_daily_ds = _geoglows_daily_ds.isel(
+            time=_geoglows_daily_ds["time"].notnull()
+        )
     return _geoglows_daily_ds
 
 
