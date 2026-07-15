@@ -27,7 +27,7 @@
         popoverClass: "tour-welcome", // wider styling — see main.css
         title: "Welcome to the Hydro-Correlation Tool!",
         description:
-          "This tool is a single-user app that allows a researcher to build and verify a table of corresponding NWM, USGS, and GEOGLOWS IDs.",
+          "This tool is a single-user app that allows a researcher to build and verify a table of corresponding NWM, USGS, and GEOGLOWS IDs. Curious about why this table is needed? Click the ? Help button to learn more.",
       },
     },
     {
@@ -80,7 +80,7 @@
       popover: {
         title: "Gage details",
         description:
-          "Metadata and hydrographs end up here after you click a gage; reach overlays are included as well.",
+          "Metadata and hydrographs end up here after you click a gage. Use them to compare USGS observations with each network's simulated flow.",
         side: "left",
       },
     },
