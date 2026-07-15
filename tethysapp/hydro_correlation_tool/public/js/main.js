@@ -92,6 +92,7 @@ $(function() {
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
         zIndex: 5,   // below gages (10), above basemap
+        minZoom: 9,
         style: new ol.style.Style({
             stroke: new ol.style.Stroke({ color: '#3388ff', width: 1 })
         })
@@ -101,6 +102,7 @@ $(function() {
         source: geoglows_source,
         visible: false,
         zIndex: 5,   // below gages (10), above basemap
+        minZoom: 9,
         style: new ol.style.Style({
             stroke: new ol.style.Stroke({ color: '#020447', width: 1 })
         })
@@ -164,18 +166,26 @@ $(function() {
     // the time the response lands, that response belongs to a previous selection
     // and is dropped instead of drawn under the wrong gage's metadata.
     var selection_generation = 0;
+    // The message div is shared by every request a click fires, and reach-only
+    // clicks legitimately share the gage's selection_generation — so the div
+    // needs its own owner. Bumped by each click that writes a spinner; only
+    // callbacks holding the current value may write to or clear the div.
+    var msg_generation = 0;
 
     ol_map.on('singleclick', function(evt) {
         var gage = null;
         var reach = null;
+        var feature_count = 0;
         // Walk every feature under the click and keep the FIRST of each layer.
         // The `=== null` guards dedupe: a second overlapping gage, or a reach
         // split across vector-tile boundaries, won't get logged twice.
         ol_map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
             if (layer === gage_layer && gage === null) {
                 gage = feature;
+                feature_count += 1;
             } else if ((layer === nwm_layer || layer === geoglows_layer) && reach === null) {
                 reach = feature;
+                feature_count += 1;
             }
             // Stop early once we have one of each.
             return gage !== null && reach !== null;
@@ -189,7 +199,7 @@ $(function() {
 
             series_state = {};
             selection_generation += 1;
-
+            msg_generation += 1;
             $('.panel-content').html(
                 '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
                 '<dl class="gage-meta">' +
@@ -200,28 +210,42 @@ $(function() {
                 // Message div is separate from the chart divs: the gage and reach
                 // callbacks race, and a "no data" note must be able to coexist
                 // with a chart (e.g. gage without records sitting on a live reach).
-                '<div id="hydrograph-msg"></div>' +
+                '<div id="hydrograph-msg"><p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p></div>' +
                 '<div id="hydrograph-1"></div>' +
                 '<div id="hydrograph-2"></div>' +
                 '<div id="hydrograph-3"></div>'
             );
+            
 
 
             // Capture the generation this request belongs to; the callback
             // compares it against the current one and drops stale responses.
             var gage_generation = selection_generation;
+            var cur_msg = msg_generation;
             $.get(GAGES_MD_URL, { usgs_id: gage.get('USGSID') }, function(data) {
                 if (gage_generation !== selection_generation) {
                     return;   // user has since selected a different gage (or cleared)
                 }
                 if (data.dates.length === 0) {
-                    $('#hydrograph-msg').html('<p class="text-muted">No observed discharge data for this gage.</p>');
+                    if (cur_msg === msg_generation) {
+                        $('#hydrograph-msg').html('<p class="text-muted">No observed discharge data for this gage.</p>');
+                    }
                     return;
                 }
 
                 series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
+
+                feature_count -= 1;
+                if (feature_count === 0 && cur_msg === msg_generation){
+                    $('#hydrograph-msg').empty();
+                }
                 render_hydrograph();
 
+            }).fail(function(){
+                if (gage_generation !== selection_generation || cur_msg !== msg_generation) {
+                    return;
+                }
+                $('#hydrograph-msg').html('<p class="text-muted">Could not load USGS data — try re-selecting the gage.</p>');
             });
 
             
@@ -241,6 +265,11 @@ $(function() {
         }
 
         if (reach !== null) {
+            if (gage === null){
+                msg_generation += 1;
+                $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>');
+            }
+            var cur_msg = msg_generation;
             var network = null;
 
             if (geoglows_layer.getVisible()) {
@@ -263,12 +292,25 @@ $(function() {
                     return;
                 }
                 if (data.dates.length === 0) {
+                    if (cur_msg === msg_generation) {
+                        $('#hydrograph-msg').html('<p class="text-muted">No retrospective data for this reach.</p>');
+                    }
                     return;
                 }
 
                 series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+
+                feature_count -= 1;
+                if (feature_count === 0 && cur_msg === msg_generation){
+                    $('#hydrograph-msg').empty();
+                }
                 render_hydrograph();
 
+            }).fail(function(){
+                if (reach_generation !== selection_generation || cur_msg !== msg_generation) {
+                    return;
+                }
+                $('#hydrograph-msg').html('<p class="text-muted">Could not load ' + network + ' data — try re-selecting the gage.</p>');
             });
         };
     });
