@@ -22,19 +22,19 @@ class App(TethysAppBase):
                 name='MapBox PK Token',
                 type=CustomSetting.TYPE_STRING,
                 description='The key for the mapbox vector tiles.',
-                required=False
+                required=True
             ),
             CustomSetting(
                 name='USGS API Token',
                 type=CustomSetting.TYPE_STRING,
-                description='The key for the USGS data.',
+                description='The key for the USGS data. Optional, as it just raises rate limits.',
                 required=False
             ),
             CustomSetting(
                 name='NWM API Token',
                 type=CustomSetting.TYPE_STRING,
                 description='The key for the NWM API',
-                required=False
+                required=True
             ),
             CustomSetting(
                 name='Headwater Threshold',
