@@ -36,5 +36,12 @@ class App(TethysAppBase):
                 description='The key for the NWM API',
                 required=False
             ),
+            CustomSetting(
+                name='Headwater Threshold',
+                type=CustomSetting.TYPE_INTEGER,
+                description='The lowest order stream order threshold, not inclusive. If you enter "2", the toggle shows 3 and up.',
+                required=False,
+                default=2
+            )
         )
         return custom_settings

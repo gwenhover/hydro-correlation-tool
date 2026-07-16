@@ -58,6 +58,15 @@
       },
     },
     {
+      element: ".headwater-toggle",
+      popover: {
+        title: "Headwater toggle",
+        description:
+          "Click here to toggle the headwaters. This declutters the map by hiding the smallest tributaries.",
+        side: "left",
+      },
+    },
+    {
       element: "#tour-chart-mode",
       popover: {
         title: "Chart mode",
@@ -87,9 +96,9 @@
     {
       element: ".header-button",
       popover: {
-        title: "Need this again?",
+        title: "Need help?",
         description:
-          "If you forget what anything does, the help button shows this tour again. Thanks!",
+          "If you are having trouble, the help button has additional information. Thanks!",
         side: "bottom",
       },
     },

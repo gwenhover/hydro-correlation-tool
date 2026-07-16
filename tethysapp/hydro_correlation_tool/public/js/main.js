@@ -33,6 +33,35 @@ $(function() {
     var gageStyleCache = {};        // radius -> reusable Style (avoid rebuilding per feature)
     var gageLastResolution = null;  // every feature in one frame shares a resolution...
     var gageLastStyle = null;       // ...so memoize to skip recomputing ~9,000x per frame
+    var headwaters = false;
+
+
+    var hw_button = document.createElement('button');
+    hw_button.innerHTML = 'H';
+    hw_button.title = 'Show headwater streams';
+    
+    var hw_element = document.createElement('div');
+    hw_element.className = 'headwater-toggle ol-unselectable ol-control';
+    hw_element.appendChild(hw_button);
+
+    hw_button.classList.add('active');
+    hw_button.addEventListener('click', function() {
+
+        hw_button.classList.toggle('active');
+        if (headwaters){
+            headwaters = false;
+            hw_button.title = 'Show headwater streams';
+        }
+        else {
+            headwaters = true;
+            hw_button.title = 'Hide headwater streams';
+        }
+        nwm_layer.changed();
+        geoglows_layer.changed();
+    });
+    ol_map.addControl(new ol.control.Control({ element: hw_element }));
+
+
 
     function gageStyle(feature, resolution) {
         // Fast path: same frame (same resolution) -> reuse the computed style.
@@ -88,14 +117,28 @@ $(function() {
         maxZoom: 12,
         url: 'https://{a-d}.tiles.mapbox.com/v4/byu-hydroinformatics.geoglows-us/{z}/{x}/{y}.vector.pbf?access_token=' + MAPBOX_TOKEN
     });
-
+    var nwm_style = new ol.style.Style({
+        stroke: new ol.style.Stroke({color: '#3388ff', width: 1 })
+    });
+    var geo_style = new ol.style.Style({
+        stroke: new ol.style.Stroke({color: '#020447', width: 1 })
+    });
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#3388ff', width: 1 })
-        })
+        style: function(feature){
+            if (!headwaters){
+                if (feature.get("streamOrder") > HEADWATER_THRESHOLD){
+                    return (nwm_style)
+                } 
+                else {
+                    return
+                }
+            }
+            return (nwm_style)
+            
+        }
     });
 
     var geoglows_layer = new ol.layer.VectorTile({
@@ -103,15 +146,22 @@ $(function() {
         visible: false,
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
-        style: new ol.style.Style({
-            stroke: new ol.style.Stroke({ color: '#020447', width: 1 })
-        })
+        style: function(feature){
+            if (!headwaters){
+                if (feature.get("streamOrder") > HEADWATER_THRESHOLD){
+                    return (geo_style)
+                } 
+                else {
+                    return
+                }
+            }
+            return (geo_style)
+        },
     });
 
     ol_map.addLayer(nwm_layer);
 
     ol_map.addLayer(geoglows_layer);
-
 
     // --- Selected-gage highlight ring --------------------------------------
     // A normally-empty layer holding only the currently-selected gage, drawn as

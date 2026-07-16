@@ -140,3 +140,22 @@
     padding-top: 1rem;    /* content starts 1rem below the panel's top edge */
 }
 
+.headwater-toggle {
+    top: 2.3em;
+    right: 0.5em;
+}
+
+.headwater-toggle button {
+    position: relative;   /* anchors the overlay to the button */
+}
+
+.headwater-toggle button.active::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border: 2px solid #c00;
+    border-radius: 50%;
+    background: linear-gradient(45deg,
+        transparent 44%, #c00 44%,
+        #c00 56%, transparent 56%);
+}

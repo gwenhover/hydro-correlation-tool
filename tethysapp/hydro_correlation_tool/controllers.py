@@ -47,6 +47,7 @@ def home(request):
     context = {
         'map_view': map_view,
         'mapbox_token': App.get_custom_setting('MapBox PK Token'),
+        'headwater_threshold': App.get_custom_setting('Headwater Threshold') or 2,
     }
 
     return App.render(request, 'home.html', context)
