@@ -62,7 +62,7 @@
       popover: {
         title: "Headwater toggle",
         description:
-          "Click here to toggle the headwaters. This declutters the map by hiding the smallest tributaries.",
+          "This is the headwater toggle. The smallest tributaries are off by default, but can be added back by clicking here. Check the app settings to configure this filter.",
         side: "left",
       },
     },
