@@ -4,6 +4,7 @@ from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
 import pandas as pd
 import os
+import hydroeval as he
 
 Base = declarative_base()  
 
@@ -15,7 +16,11 @@ class hctTable(Base):
     longitude = Column(Float, nullable=False)
     geom = Column(Geometry('POINT', srid=4326), nullable=False)
     nwm_feature_id = Column(BigInteger, nullable=True)
+    nwm_kge_rating = Column(Float, nullable=True)
+    nwm_kge_shared_dates = Column(BigInteger, nullable=True)
     geoglows_river_id = Column(BigInteger, nullable=True)
+    geoglows_kge_rating = Column(Float, nullable=True)
+    geoglows_kge_shared_dates = Column(BigInteger, nullable=True)
     verification_status = Column(String, nullable=False, default='Unverified')
     last_modified_by = Column(String, nullable=True)
     last_modified_timestamp = Column(DateTime(timezone=True), nullable=True)
@@ -52,3 +57,10 @@ def create_row(row):
                        longitude=row['longitude'], geom=geomPoint, nwm_feature_id=nwm_row,
                        geoglows_river_id=geo_row)
     return(new_row)
+
+
+# this is a placeholder location for this function, as it is meant to be called when the user clicks 'verify and save'. When that is built this will go there.
+def kge_rating(simulated, observed):
+    kge_array, r, alpha, beta = he.evaluator(he.kge, simulated, observed)
+    kge = float(kge_array[0])
+    return kge

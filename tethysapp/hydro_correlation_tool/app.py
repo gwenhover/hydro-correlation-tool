@@ -1,5 +1,5 @@
 from tethys_sdk.base import TethysAppBase
-from tethys_sdk.app_settings import CustomSetting
+from tethys_sdk.app_settings import CustomSetting, PersistentStoreDatabaseSetting
 
 class App(TethysAppBase):
     """
@@ -45,3 +45,19 @@ class App(TethysAppBase):
             )
         )
         return custom_settings
+    
+    def persistent_store_settings(self):
+        """
+        Define Persistent Store Settings.
+        """
+        ps_settings = (
+            PersistentStoreDatabaseSetting(
+                name='primary_db',
+                description='primary database',
+                initializer='hydro_correlation_tool.model.init_primary_db',
+                required=True,
+                spatial=True
+            ),
+        )
+        return (ps_settings)
+
