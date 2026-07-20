@@ -12,9 +12,8 @@
 {% block scripts %}
   {# Define page-specific globals BEFORE base.html's block.super loads main.js. #}
   {# Django resolves the static URL / token server-side; main.js reads these. #}
-  {# Swap the data file by changing only this one filename. #}
   <script type="text/javascript">
-    var GAGES_GEOJSON_URL = "{% static tethys_app.package|add:'/data/merged_gages.geojson' %}";
+    var GAGES_GEOJSON_URL = "{% url 'hydro_correlation_tool:db_get_gage' %}";
     var MAPBOX_TOKEN = "{{ mapbox_token }}";
     var HEADWATER_THRESHOLD = "{{ headwater_threshold }}";
     var GAGES_MD_URL = "{% url 'hydro_correlation_tool:get_gage_info' %}";

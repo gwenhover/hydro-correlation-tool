@@ -3,7 +3,8 @@ from .app import App
 from tethys_sdk.gizmos import MapView, MVView
 from django.http import JsonResponse
 from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective, get_nwm_retrospective
-
+import geopandas as gpd
+from django.http import HttpResponse
 
 @controller
 def home(request):
@@ -80,3 +81,21 @@ def get_reach_info(request):
             river_id, '2020-01-01', '2020-12-31', api_key=App.get_custom_setting('NWM API Token')
         )
     return JsonResponse(reach_data)
+
+@controller(
+    name='db_get_gage',
+    url='db_gage',
+)
+def db_get_gage(request):
+    Engine = App.get_persistent_store_database('primary_db')
+    sql = 'SELECT usgs_id, nwm_feature_id, gage_name, geoglows_river_id, geom, verification_status FROM gage_mapping;'
+    # pandas 2.x requires SQLAlchemy>=2.0 to recognize an Engine directly, but
+    # tethys_dataset_services pins sqlalchemy<2 — pass the raw DBAPI connection
+    # instead so pandas' legacy DBAPI2 path (which read_postgis also uses) works.
+    raw_conn = Engine.raw_connection()
+    try:
+        gdf_json = gpd.read_postgis(sql, raw_conn, 'geom').to_json()
+    finally:
+        raw_conn.close()
+    return (HttpResponse(gdf_json, content_type="application/json"))
+    

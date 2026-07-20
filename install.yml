@@ -10,13 +10,16 @@ requirements:
   skip: false
   conda:
     channels:
+      - conda-forge
     packages:
+      - geopandas
 
   pip:
     - dataretrieval
     - geoglows
     - geoalchemy2
     - hydroeval
+    - requests
   npm:
 
 post:

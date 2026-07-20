@@ -251,9 +251,9 @@ $(function() {
             selection_generation += 1;
             msg_generation += 1;
             $('.panel-content').html(
-                '<h6 class="gage-name">' + gage.get('station_nm') + '</h6>' +
+                '<h6 class="gage-name">' + gage.get('gage_name') + '</h6>' +
                 '<dl class="gage-meta">' +
-                    '<dt>USGS ID</dt><dd>' + gage.get('USGSID') + '</dd>' +
+                    '<dt>USGS ID</dt><dd>' + gage.get('usgs_id') + '</dd>' +
                     '<dt>Latitude</dt><dd>' + lonLat[1].toFixed(5) + '</dd>' +
                     '<dt>Longitude</dt><dd>' + lonLat[0].toFixed(5) + '</dd>' +
                 '</dl>' +
@@ -272,7 +272,7 @@ $(function() {
             // compares it against the current one and drops stale responses.
             var gage_generation = selection_generation;
             var cur_msg = msg_generation;
-            $.get(GAGES_MD_URL, { usgs_id: gage.get('USGSID') }, function(data) {
+            $.get(GAGES_MD_URL, { usgs_id: gage.get('usgs_id') }, function(data) {
                 if (gage_generation !== selection_generation) {
                     return;   // user has since selected a different gage (or cleared)
                 }
