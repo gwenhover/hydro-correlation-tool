@@ -24,17 +24,20 @@ $(function() {
         })
     });
 
-    // The layer = HOW to draw the source. One flat-colored dot per gage.
-    // (Color-by-verification-status comes in Week 7 once the DB exists — a
-    // single color is correct for now.)
+
     // Zoom-responsive gage styling: small dots when zoomed out (clean national
     // overview), larger when zoomed in (easy click targets). Every gage stays
     // visible and clickable — nothing is hidden by zoom.
-    var gageStyleCache = {};        // radius -> reusable Style (avoid rebuilding per feature)
+    var gageStyleCache = {};
     var gageLastResolution = null;  // every feature in one frame shares a resolution...
-    var gageLastStyle = null;       // ...so memoize to skip recomputing ~9,000x per frame
+    var gageLastStyle = null;   
+    var gageLastStatus = null;    // ...so memoize to skip recomputing ~9,000x per frame
     var headwaters = false;
-
+    var statusColors = {'Verified': '#1fb449', 'Edited': '#e4c134', 'Unverified': '#b12424'}
+    var selectedNwmId = null;
+    var baseNwmId = null;
+    var selectedGeoglowsId = null;
+    var baseGeoglowsId = null;
 
     var hw_button = document.createElement('button');
     hw_button.innerHTML = 'H';
@@ -65,7 +68,9 @@ $(function() {
 
     function gageStyle(feature, resolution) {
         // Fast path: same frame (same resolution) -> reuse the computed style.
-        if (resolution === gageLastResolution) {
+        var gage_status = feature.get('verification_status');
+        var statusColor = statusColors[gage_status] || statusColors['Unverified'];
+        if (resolution === gageLastResolution && gage_status === gageLastStatus) {
             return gageLastStyle;
         }
         var zoom = ol_map.getView().getZoomForResolution(resolution);
@@ -74,21 +79,24 @@ $(function() {
         // 0.5 so only a handful of distinct Style objects are ever created.
         var t = Math.max(0, Math.min(1, (zoom - 4) / (11 - 4)));
         var radius = Math.round((3 + t * 3) * 2) / 2;
+        var key = (radius + '|' + gage_status);
 
-        if (!gageStyleCache[radius]) {
-            gageStyleCache[radius] = new ol.style.Style({
+        if (!gageStyleCache[key]) {
+            gageStyleCache[key] = new ol.style.Style({
                 image: new ol.style.Circle({
                     radius: radius,
-                    fill: new ol.style.Fill({ color: '#1f78b4' }),
+                    fill: new ol.style.Fill({ color: statusColor }),
                     stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
                 })
             });
         }
-
+        gageLastStatus = gage_status;
         gageLastResolution = resolution;
-        gageLastStyle = gageStyleCache[radius];
+        gageLastStyle = gageStyleCache[key];
         return gageLastStyle;
     }
+
+
 
     var gage_layer = new ol.layer.Vector({
         source: gage_source,
@@ -120,14 +128,26 @@ $(function() {
     var nwm_style = new ol.style.Style({
         stroke: new ol.style.Stroke({color: '#3388ff', width: 1 })
     });
+    var base_highlight_style = new ol.style.Style({
+        stroke: new ol.style.Stroke({color: '#f82aa9', width: 3})
+    });
     var geo_style = new ol.style.Style({
         stroke: new ol.style.Stroke({color: '#020447', width: 1 })
+    });
+    var selected_highlight_style = new ol.style.Style({
+        stroke: new ol.style.Stroke({color: '#cfec11', width: 3})
     });
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
         style: function(feature){
+            if (baseNwmId != null && String(feature.get('station_id')) === String(baseNwmId)){
+                return (base_highlight_style)
+            }
+            else if (selectedNwmId != null && String(feature.get('station_id')) === String(selectedNwmId)){
+                return (selected_highlight_style)
+            }
             if (!headwaters){
                 if (feature.get("streamOrder") > HEADWATER_THRESHOLD){
                     return (nwm_style)
@@ -147,6 +167,12 @@ $(function() {
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
         style: function(feature){
+            if (baseGeoglowsId != null && String(feature.get('station_id')) === String(baseGeoglowsId)){
+                return (base_highlight_style)
+            }
+            else if (selectedGeoglowsId != null && String(feature.get('station_id')) === String(selectedGeoglowsId)){
+                return (selected_highlight_style)
+            }
             if (!headwaters){
                 if (feature.get("streamOrder") > HEADWATER_THRESHOLD){
                     return (geo_style)
@@ -266,7 +292,12 @@ $(function() {
                 '<div id="hydrograph-3"></div>'
             );
             
-
+            baseNwmId = gage.get('nwm_feature_id');
+            baseGeoglowsId = gage.get('geoglows_river_id');
+            selectedNwmId = null;
+            selectedGeoglowsId = null;
+            nwm_layer.changed();
+            geoglows_layer.changed();
 
             // Capture the generation this request belongs to; the callback
             // compares it against the current one and drops stale responses.
@@ -312,6 +343,12 @@ $(function() {
             // and bumping the generation invalidates any in-flight requests.
             series_state = {};
             selection_generation += 1;
+            selectedGeoglowsId = null;
+            selectedNwmId = null;
+            baseNwmId = null;
+            baseGeoglowsId = null;
+            nwm_layer.changed();
+            geoglows_layer.changed();
         }
 
         if (reach !== null) {
@@ -321,11 +358,15 @@ $(function() {
             }
             var cur_msg = msg_generation;
             var network = null;
-
+        
             if (geoglows_layer.getVisible()) {
                 network = "GEOGLOWS";
+                selectedGeoglowsId = reach.get('station_id');
+                geoglows_layer.changed();
             } else {
                 network = "NWM"
+                selectedNwmId = reach.get('station_id');
+                nwm_layer.changed();
             }
             var net_class = 'reach-row-' + network.toLowerCase();
             $('.' + net_class).remove();
