@@ -6,7 +6,9 @@ from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective, get_
 import geopandas as gpd
 from django.http import HttpResponse
 from sqlalchemy.orm import sessionmaker
-from .model import cacheTable
+from .model import cacheTable, hctTable
+import pandas as pd
+import hydroeval as he
 
 start_date = '2018-01-01'
 end_date = '2022-12-31'
@@ -116,4 +118,51 @@ def db_get_gage(request):
     finally:
         raw_conn.close()
     return (HttpResponse(gdf_json, content_type="application/json"))
+
+@controller(
+    name='save_and_verify',
+    url='s_and_v'
+)
+def save_and_verify(request):
+    nwm_final  = (request.GET.get('river_id'))  # Placeholder for getting the stored nwm id from user (it will be a 2 item list---network, id)
+    geo_final  = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
+    usgs_final = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
+    Engine = App.get_persistent_store_database('primary_db')
+    Session = sessionmaker(bind=Engine)
+    session = Session() 
+    nwm_row =  session.get(cacheTable, (nwm_final[0], nwm_final[1]))
+    geo_row =  session.get(cacheTable, (geo_final[0], geo_final[1]))
+    usgs_row = session.get(cacheTable, (usgs_final[0], usgs_final[1]))
+    geo_df = pd.DataFrame({
+        "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
+    })
+    nwm_df = pd.DataFrame({
+            "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
+        })
+    usgs_df = pd.DataFrame({
+            "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
+        })
+    geo_df["dates"] = pd.to_datetime(geo_df["dates"])
+    nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
+    usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])
+    geo_df = geo_df.set_index("dates")
+    nwm_df = nwm_df.set_index("dates")
+    usgs_df = usgs_df.set_index("dates")
+    geo_shared_dates = geo_df.index.intersection(usgs_df.index)
+    geo_df_shared = geo_df.loc[geo_shared_dates]
+    usgs_geo_shared = usgs_df.loc[geo_shared_dates]
+    nwm_shared_dates = nwm_df.index.intersection(usgs_df.index)
+    nwm_df_shared = nwm_df.loc[nwm_shared_dates]
+    usgs_nwm_shared = usgs_df.loc[nwm_shared_dates]
+    nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
+    geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
     
+    return 
+
+def kge_rating(simulated, observed):
+    
+    
+    
+    kge_array, r, alpha, beta = he.evaluator(he.kge, simulated, observed)
+    kge = float(kge_array[0])
+    return kge
