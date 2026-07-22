@@ -9,3 +9,7 @@ preprocessing/geoglows_hydrography/
 
 # Personal learning notebooks — not part of the deliverable
 preprocessing/learning*.ipynb
+
+# Regenerated notebook outputs — rebuild via the seeding notebooks
+preprocessing/candidates_geoglows.csv
+preprocessing/gage_vpu.csv
