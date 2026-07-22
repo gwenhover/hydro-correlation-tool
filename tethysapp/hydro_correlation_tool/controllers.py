@@ -92,7 +92,7 @@ def get_reach_info(request):
             reach_data = get_nwm_retrospective(
                 river_id, start_date, end_date, api_key=App.get_custom_setting('NWM API Token')
             )
-        if (reach_data['dates']):
+        if not reach_data.get("error"):
             new_row = cacheTable(network=network, reach_id=river_id, reach_data=reach_data, start_date=start_date, end_date=end_date)
             session.add(new_row)
             session.commit()

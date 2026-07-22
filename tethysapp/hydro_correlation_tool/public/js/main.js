@@ -385,6 +385,8 @@ $(function() {
                 if (data.dates.length === 0) {
                     if (cur_msg === msg_generation) {
                         $('#hydrograph-msg').html('<p class="text-muted">No retrospective data for this reach.</p>');
+                        series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+                        render_hydrograph();
                     }
                     return;
                 }

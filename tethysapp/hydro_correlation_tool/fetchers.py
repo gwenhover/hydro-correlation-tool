@@ -69,12 +69,15 @@ def _geoglows_daily_series(river_id, start, end):
 def get_geoglows_retrospective(river_id, start, end):
     try:
         dates, values = _geoglows_daily_series(int(river_id), start, end)
+    except KeyError:
+        print("No data")
+        return {"dates": [], "values": [], "units": None}
     except Exception as e:
         # bad/unknown river_id, network error, AWS down, etc. Log it, then
         # return the same empty shape as the USGS fetcher so the front end
         # can show its empty state.
         print("GEOGLOWS retrospective fetch failed:", repr(e))
-        return {"dates": [], "values": [], "units": None}
+        return {"dates": [], "values": [], "units": None, "error": "transient"}
 
     return {
         "dates": list(dates),
@@ -107,12 +110,12 @@ def get_nwm_retrospective(river_id, start, end, api_key):
 
     try: 
         dates, daily = _nwm_daily_series(river_id, start, end, api_key)
-        
+
         return {"dates": list(dates), "values": list(daily), "units": "m^3/s"}
     
     except Exception as e:
         print("NWM retrospective fetch failed:", repr(e))
-        return {"dates": [], "values": [], "units": None}
+        return {"dates": [], "values": [], "units": None, "error": "transient"}
         
         
 
