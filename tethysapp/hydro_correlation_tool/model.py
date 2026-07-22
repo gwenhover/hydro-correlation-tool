@@ -1,10 +1,12 @@
-from sqlalchemy import Column, String, Float, BigInteger, DateTime
+from sqlalchemy import Column, String, Float, BigInteger, DateTime, Date
 from sqlalchemy.orm import declarative_base, sessionmaker
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
 import pandas as pd
 import os
 import hydroeval as he
+from sqlalchemy.dialects.postgresql import JSONB
+
 
 Base = declarative_base()  
 
@@ -25,7 +27,15 @@ class hctTable(Base):
     last_modified_by = Column(String, nullable=True)
     last_modified_timestamp = Column(DateTime(timezone=True), nullable=True)
 
+class cacheTable(Base):
+    __tablename__ = 'retrospective_cache'
+    network = Column(String, nullable=False, primary_key=True)
+    reach_id = Column(BigInteger, nullable=False, primary_key=True)
+    reach_data = Column(JSONB, nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
 
+    
 SEED_CSV = os.path.join(os.path.dirname(__file__), 'public', 'data', 'seed.csv')
 
 def init_primary_db(engine, first_time):

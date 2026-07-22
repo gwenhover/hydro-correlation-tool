@@ -5,6 +5,11 @@ from django.http import JsonResponse
 from .fetchers import get_usgs_daily_discharge, get_geoglows_retrospective, get_nwm_retrospective
 import geopandas as gpd
 from django.http import HttpResponse
+from sqlalchemy.orm import sessionmaker
+from .model import cacheTable
+
+start_date = '2018-01-01'
+end_date = '2022-12-31'
 
 @controller
 def home(request):
@@ -60,7 +65,7 @@ def home(request):
 def get_gage_info(request):
     usgs_id = request.GET.get('usgs_id')
     gage_data = get_usgs_daily_discharge(
-        usgs_id, '2020-01-01', '2020-12-31',
+        usgs_id, start_date, end_date,
         api_key=App.get_custom_setting('USGS API Token'),
     )
     return JsonResponse(gage_data)
@@ -70,17 +75,30 @@ def get_gage_info(request):
     url='reach-info',
 )
 def get_reach_info(request):
-    river_id = request.GET.get('river_id')
+    river_id = int(request.GET.get('river_id'))
     network = request.GET.get('network')
-    if network == 'GEOGLOWS':
-        reach_data = get_geoglows_retrospective(
-            river_id, '2020-01-01', '2020-12-31'
-        )
-    else:
-        reach_data = get_nwm_retrospective(
-            river_id, '2020-01-01', '2020-12-31', api_key=App.get_custom_setting('NWM API Token')
-        )
-    return JsonResponse(reach_data)
+    Engine = App.get_persistent_store_database('primary_db')
+    Session = sessionmaker(bind=Engine)
+    session = Session() 
+    try:
+        row = session.get(cacheTable, (network, river_id))
+        if (row):
+            return (JsonResponse(row.reach_data))
+        if network == 'GEOGLOWS':
+            reach_data = get_geoglows_retrospective(
+                river_id, start_date, end_date
+            )
+        else:
+            reach_data = get_nwm_retrospective(
+                river_id, start_date, end_date, api_key=App.get_custom_setting('NWM API Token')
+            )
+        if (reach_data['dates']):
+            new_row = cacheTable(network=network, reach_id=river_id, reach_data=reach_data, start_date=start_date, end_date=end_date)
+            session.add(new_row)
+            session.commit()
+        return JsonResponse(reach_data)
+    finally:
+        session.close()
 
 @controller(
     name='db_get_gage',

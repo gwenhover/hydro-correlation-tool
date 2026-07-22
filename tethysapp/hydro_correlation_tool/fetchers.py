@@ -1,5 +1,4 @@
 import os
-from functools import lru_cache
 import geoglows
 from dataretrieval import waterdata
 import requests
@@ -52,11 +51,8 @@ def _get_geoglows_daily_ds():
     return _geoglows_daily_ds
 
 
-@lru_cache(maxsize=128)
+
 def _geoglows_daily_series(river_id, start, end):
-    # Returns immutable tuples so cached results can't be mutated by callers.
-    # lru_cache only caches successes (exceptions propagate uncached), so a
-    # transient network failure doesn't poison the cache for that river.
     series = (
         _get_geoglows_daily_ds()["Q"]
         .sel(river_id=river_id)
@@ -86,12 +82,8 @@ def get_geoglows_retrospective(river_id, start, end):
         "units": "m^3/s",   # GEOGLOWS is always cms; no units column to read
     }
     
-    
-@lru_cache(maxsize=128)
+
 def _nwm_daily_series(river_id, start, end, api_key):
-    # Returns immutable tuples so cached results can't be mutated by callers.
-    # lru_cache only caches successes (exceptions propagate uncached), so a
-    # transient network failure doesn't poison the cache for that river.
     nwm_params = {
         'reach_id': river_id,
         'start_time': start,
