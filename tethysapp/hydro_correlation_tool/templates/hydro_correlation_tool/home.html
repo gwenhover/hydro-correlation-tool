@@ -18,6 +18,7 @@
     var HEADWATER_THRESHOLD = "{{ headwater_threshold }}";
     var GAGES_MD_URL = "{% url 'hydro_correlation_tool:get_gage_info' %}";
     var REACH_URL = "{% url 'hydro_correlation_tool:get_reach_info' %}";
+    var SAVE_URL = "{% url 'hydro_correlation_tool:save_and_verify' %}";
   </script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   {{ block.super }}

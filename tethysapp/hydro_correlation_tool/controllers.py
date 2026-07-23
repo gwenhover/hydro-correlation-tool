@@ -140,19 +140,16 @@ def db_get_gage(request):
     url='s_and_v'
 )
 def save_and_verify(request):
-    nwm_final  = (request.GET.get('river_id'))  # Placeholder for getting the stored nwm id from user (it will be a 2 item list---network, id)
-    nwm_final[1] = int(nwm_final[1])
-    geo_final  = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
-    geo_final[1] = int(geo_final[1])
-    usgs_final = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
-    usgs_final[1] = usgs_final[1].removeprefix("USGS-")
+    nwm_final  = int((request.POST.get('nwm_id')))  # Placeholder for getting the stored nwm id from user (it will be a 2 item list---network, id)
+    geo_final  = int((request.POST.get('geo_id'))) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
+    usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-") # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
     Engine = App.get_persistent_store_database('primary_db')
     Session = sessionmaker(bind=Engine)
     session = Session() 
     try:
-        nwm_row =  session.get(cacheTable, (nwm_final[0], nwm_final[1]))
-        geo_row =  session.get(cacheTable, (geo_final[0], geo_final[1]))
-        usgs_row = session.get(cacheTable, (usgs_final[0], int(usgs_final[1])))
+        nwm_row =  session.get(cacheTable, ("NWM", nwm_final))
+        geo_row =  session.get(cacheTable, ("GEOGLOWS", geo_final))
+        usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
         if geo_row is None or len(geo_row.reach_data["dates"]) == 0 or nwm_row is None or len(nwm_row.reach_data["dates"]) == 0 or usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
             return JsonResponse({"Error": "Missing data, check selected IDs"})
         geo_df = pd.DataFrame({
@@ -186,16 +183,16 @@ def save_and_verify(request):
         geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
         nwm_usgs_kge_length = len(nwm_df_shared['values'])
         geo_usgs_kge_length = len(geo_df_shared['values'])
-        new_row = session.get(hctTable, f"USGS-{usgs_final[1]}")
+        new_row = session.get(hctTable, f"USGS-{usgs_final}")
         if new_row is None:
             print("ERROR: Could not save or validate")
             return JsonResponse({"Error": "Could not save or validate"})
-        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final[1] and int(new_row.geoglows_river_id) == geo_final[1]:
+        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final and int(new_row.geoglows_river_id) == geo_final:
             new_row.verification_status = 'Verified'
         else:
             new_row.verification_status = 'Edited'
-            new_row.nwm_feature_id = nwm_final[1]
-            new_row.geoglows_river_id = geo_final[1]
+            new_row.nwm_feature_id = nwm_final
+            new_row.geoglows_river_id = geo_final
         new_row.nwm_kge_rating = nwm_usgs_kge
         new_row.geoglows_kge_rating = geo_usgs_kge
         new_row.nwm_kge_shared_dates = nwm_usgs_kge_length

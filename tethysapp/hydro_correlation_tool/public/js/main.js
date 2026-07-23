@@ -1,4 +1,16 @@
 $(function() {
+    function getCookie(name) {
+        var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+    }
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD)$/i.test(settings.type)) {
+                xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+            }
+        }
+    });
+
     var ol_map = TETHYS_MAP_VIEW.getMap();
 
     // Fit the view to the CONUS bounding box [west, south, east, north].
@@ -38,6 +50,7 @@ $(function() {
     var baseNwmId = null;
     var selectedGeoglowsId = null;
     var baseGeoglowsId = null;
+    var selectedUsgsId = null;
 
     var hw_button = document.createElement('button');
     hw_button.innerHTML = 'H';
@@ -264,6 +277,20 @@ $(function() {
         }
         
     });
+        
+    /* $('#save-and-verify').on('click', function() {
+        $.post(SAVE_URL, { nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
+            if ("Error" in data){
+
+            }
+            else{
+                nwm_kge = data.nwm_kge
+                geo_kge = data.geo_kge
+            }
+        });
+    });
+    */
+
     // --- Click handling ----------------------------------------------------
 
     // On a map click, find the gage and/or reach under the cursor. A gage
@@ -336,6 +363,7 @@ $(function() {
             baseGeoglowsId = gage.get('geoglows_river_id');
             selectedNwmId = null;
             selectedGeoglowsId = null;
+            selectedUsgsId = gage.get('usgs_id');
             staged_geoglows = null;
             staged_nwm = null;
             $('#staged_id').text("Stage: ");
@@ -388,6 +416,7 @@ $(function() {
             selection_generation += 1;
             selectedGeoglowsId = null;
             selectedNwmId = null;
+            selectedUsgsId = null;
             baseNwmId = null;
             baseGeoglowsId = null;
             nwm_layer.changed();
