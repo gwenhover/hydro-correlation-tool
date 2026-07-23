@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from .model import cacheTable, hctTable
 import pandas as pd
 import hydroeval as he
+from django.utils import timezone
 
 start_date = '2018-01-01'
 end_date = '2022-12-31'
@@ -65,12 +66,27 @@ def home(request):
     url='gage-info',
 )
 def get_gage_info(request):
-    usgs_id = request.GET.get('usgs_id')
-    gage_data = get_usgs_daily_discharge(
-        usgs_id, start_date, end_date,
-        api_key=App.get_custom_setting('USGS API Token'),
-    )
-    return JsonResponse(gage_data)
+    usgs_id = (request.GET.get('usgs_id'))
+    network = 'USGS'
+    Engine = App.get_persistent_store_database('primary_db')
+    Session = sessionmaker(bind=Engine)
+    session = Session() 
+    try:
+        row = session.get(cacheTable, (network, int(usgs_id.removeprefix("USGS-"))))
+        if (row):
+            return (JsonResponse(row.reach_data))
+        else:
+            gage_data = get_usgs_daily_discharge(
+                usgs_id, start_date, end_date,
+                api_key=App.get_custom_setting('USGS API Token'),
+            )
+        if not gage_data.get("error"):
+            new_row = cacheTable(network=network, reach_id=int(usgs_id.removeprefix("USGS-")), reach_data=gage_data, start_date=start_date, end_date=end_date)
+            session.add(new_row)
+            session.commit()
+        return JsonResponse(gage_data)
+    finally:
+        session.close()
 
 @controller(
     name='get_reach_info',
@@ -125,39 +141,68 @@ def db_get_gage(request):
 )
 def save_and_verify(request):
     nwm_final  = (request.GET.get('river_id'))  # Placeholder for getting the stored nwm id from user (it will be a 2 item list---network, id)
+    nwm_final[1] = int(nwm_final[1])
     geo_final  = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
+    geo_final[1] = int(geo_final[1])
     usgs_final = (request.GET.get('river_id')) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
+    usgs_final[1] = usgs_final[1].removeprefix("USGS-")
     Engine = App.get_persistent_store_database('primary_db')
     Session = sessionmaker(bind=Engine)
     session = Session() 
-    nwm_row =  session.get(cacheTable, (nwm_final[0], nwm_final[1]))
-    geo_row =  session.get(cacheTable, (geo_final[0], geo_final[1]))
-    usgs_row = session.get(cacheTable, (usgs_final[0], usgs_final[1]))
-    geo_df = pd.DataFrame({
-        "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
-    })
-    nwm_df = pd.DataFrame({
-            "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
+    try:
+        nwm_row =  session.get(cacheTable, (nwm_final[0], nwm_final[1]))
+        geo_row =  session.get(cacheTable, (geo_final[0], geo_final[1]))
+        usgs_row = session.get(cacheTable, (usgs_final[0], int(usgs_final[1])))
+        if geo_row.reach_data["dates"] is None or nwm_row.reach_data["dates"] is None or usgs_row.reach_data["dates"] is None:
+            return JsonResponse({"Error": "Missing data, check selected IDs"})
+        geo_df = pd.DataFrame({
+            "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
         })
-    usgs_df = pd.DataFrame({
-            "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
-        })
-    geo_df["dates"] = pd.to_datetime(geo_df["dates"])
-    nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
-    usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])
-    geo_df = geo_df.set_index("dates")
-    nwm_df = nwm_df.set_index("dates")
-    usgs_df = usgs_df.set_index("dates")
-    geo_shared_dates = geo_df.index.intersection(usgs_df.index)
-    geo_df_shared = geo_df.loc[geo_shared_dates]
-    usgs_geo_shared = usgs_df.loc[geo_shared_dates]
-    nwm_shared_dates = nwm_df.index.intersection(usgs_df.index)
-    nwm_df_shared = nwm_df.loc[nwm_shared_dates]
-    usgs_nwm_shared = usgs_df.loc[nwm_shared_dates]
-    nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
-    geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
+        nwm_df = pd.DataFrame({
+                "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
+            })
+        usgs_df = pd.DataFrame({
+                "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
+            })
+        geo_df["dates"] = pd.to_datetime(geo_df["dates"])
+        nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
+        usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])
+        geo_df = geo_df.set_index("dates")
+        nwm_df = nwm_df.set_index("dates")
+        usgs_df = usgs_df.set_index("dates")
+        geo_shared_dates = geo_df.index.intersection(usgs_df.index)
+        geo_df_shared = geo_df.loc[geo_shared_dates]
+        usgs_geo_shared = usgs_df.loc[geo_shared_dates]
+        nwm_shared_dates = nwm_df.index.intersection(usgs_df.index)
+        nwm_df_shared = nwm_df.loc[nwm_shared_dates]
+        usgs_nwm_shared = usgs_df.loc[nwm_shared_dates]
+        nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
+        geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
+        nwm_usgs_kge_length = len(nwm_df_shared['values'])
+        geo_usgs_kge_length = len(geo_df_shared['values'])
+        new_row = session.get(hctTable, f"USGS-{usgs_final[1]}")
+        if new_row is None:
+            print("ERROR: Could not save or validate")
+            return JsonResponse({"Error": "Could not save or validate"})
+        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final[1] and int(new_row.geoglows_river_id) == geo_final[1]:
+            new_row.verification_status = 'Verified'
+        else:
+            new_row.verification_status = 'Edited'
+            new_row.nwm_feature_id = nwm_final[1]
+            new_row.geoglows_river_id = geo_final[1]
+        new_row.nwm_kge_rating = nwm_usgs_kge
+        new_row.geoglows_kge_rating = geo_usgs_kge
+        new_row.nwm_kge_shared_dates = nwm_usgs_kge_length
+        new_row.geoglows_kge_shared_dates = geo_usgs_kge_length
+        new_row.last_modified_by = request.user.username
+        new_row.last_modified_timestamp = timezone.now()
+        
+        session.commit()
+        
+    finally:
+        session.close()
     
-    return 
+    return JsonResponse({'nwm_kge': nwm_usgs_kge, 'geo_kge': geo_usgs_kge})
 
 def kge_rating(simulated, observed):
     

@@ -14,16 +14,20 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
             parameter_code="00060",
             time=(start,end)
         )
+    except KeyError:
+        print("No data")
+        return {"dates": [], "values": [], "units": None}
+    
     except Exception as e:
         # network error, bad id, api down, etc. Log it so failures aren't silent,
         # but still return an empty result so the front end shows an empty state.
         print("USGS daily discharge fetch failed:", repr(e))
-        return {"dates": [], "values": [], "units": None}
+        return {"dates": [], "values": [], "units": None, "error": "transient"}
     
     if data is None or data.empty:
+        print("No data")
         return {"dates": [], "values": [], "units": None}
     
-
     return {
         "dates": data["time"].dt.strftime("%Y-%m-%d").tolist(),
         "values": (data["value"] * 0.0283168).tolist(),
@@ -110,15 +114,13 @@ def get_nwm_retrospective(river_id, start, end, api_key):
 
     try: 
         dates, daily = _nwm_daily_series(river_id, start, end, api_key)
-
-        return {"dates": list(dates), "values": list(daily), "units": "m^3/s"}
     
+    except KeyError:
+            print("No data")
+            return {"dates": [], "values": [], "units": None}
+        
     except Exception as e:
         print("NWM retrospective fetch failed:", repr(e))
         return {"dates": [], "values": [], "units": None, "error": "transient"}
-        
-        
-
-        
-        
-        
+    
+    return {"dates": list(dates), "values": list(daily), "units": "m^3/s"}
