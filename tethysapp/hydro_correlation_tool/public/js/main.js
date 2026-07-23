@@ -225,7 +225,45 @@ $(function() {
         $('#network-nwm').removeClass('btn-primary').addClass('btn-outline-primary');
     });
 
+    $('#stage-reach').on('click', function() {
 
+        if (geoglows_layer.getVisible()){
+            if (selectedGeoglowsId === null && staged_nwm === null){
+                $('#staged_id').text("Did not stage, select a reach and try again")
+                return
+            }
+            else if (selectedGeoglowsId === null){
+                $('#staged_id').text("Staged GEOGLOWS: Select a reach and try again. Staged NWM: " + staged_nwm)
+                return
+            }
+                
+            staged_geoglows = selectedGeoglowsId;
+            if (staged_nwm !== null){
+                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows + '  Staged NWM: ' + staged_nwm);
+            }
+            else{
+                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows);
+            }
+        }
+        else{
+            if (selectedNwmId === null && staged_geoglows === null){
+                $('#staged_id').text("Did not stage, select a reach and try again")
+                return
+            }
+            else if (selectedNwmId === null){
+                $('#staged_id').text("Staged GEOGLOWS: " + staged_geoglows + "Staged NWM: Select a reach and try again.")
+                return
+            }
+            staged_nwm = selectedNwmId;
+            if (staged_geoglows !== null){
+                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows + '  Staged NWM: ' + staged_nwm);
+            }
+            else{
+                $('#staged_id').text('Staged NWM: ' + staged_nwm);
+            }
+        }
+        
+    });
     // --- Click handling ----------------------------------------------------
 
     // On a map click, find the gage and/or reach under the cursor. A gage
@@ -236,7 +274,8 @@ $(function() {
     var series_state = {};
     var current_unit = 'cms'
     var current_chart = 'single'
-
+    var staged_geoglows = null
+    var staged_nwm = null
     // Bumped every time series_state is reset (new gage selected, or selection
     // cleared). Each $.get captures the value at request time; if it changed by
     // the time the response lands, that response belongs to a previous selection
@@ -289,13 +328,17 @@ $(function() {
                 '<div id="hydrograph-msg"><p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p></div>' +
                 '<div id="hydrograph-1"></div>' +
                 '<div id="hydrograph-2"></div>' +
-                '<div id="hydrograph-3"></div>'
+                '<div id="hydrograph-3"></div>' +
+                '<div id="stage_button"></div>'
             );
             
             baseNwmId = gage.get('nwm_feature_id');
             baseGeoglowsId = gage.get('geoglows_river_id');
             selectedNwmId = null;
             selectedGeoglowsId = null;
+            staged_geoglows = null;
+            staged_nwm = null;
+            $('#staged_id').text("Stage: ");
             nwm_layer.changed();
             geoglows_layer.changed();
 
@@ -349,6 +392,9 @@ $(function() {
             baseGeoglowsId = null;
             nwm_layer.changed();
             geoglows_layer.changed();
+            staged_geoglows = null;
+            staged_nwm = null;
+            $('#staged_id').text("Stage: ");
         }
 
         if (reach !== null) {
@@ -446,7 +492,7 @@ $(function() {
 
             Plotly.react('hydrograph-1', traces, layout);
             used_count = 1;                 // single mode draws into the first div only
-
+            
         } else {
             // Stacked mode: one chart per series, all sharing a common y-axis
             // range so magnitudes are directly comparable — a wrong reach shows

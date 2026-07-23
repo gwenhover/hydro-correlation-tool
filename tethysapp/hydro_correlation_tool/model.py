@@ -68,9 +68,3 @@ def create_row(row):
                        geoglows_river_id=geo_row)
     return(new_row)
 
-
-# this is a placeholder location for this function, as it is meant to be called when the user clicks 'verify and save'. When that is built this will go there.
-def kge_rating(simulated, observed):
-    kge_array, r, alpha, beta = he.evaluator(he.kge, simulated, observed)
-    kge = float(kge_array[0])
-    return kge

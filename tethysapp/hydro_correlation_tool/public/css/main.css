@@ -39,6 +39,9 @@
     flex: 1 1 0;
     margin-bottom: 0;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 /* The Network group hosts the longest word (GEOGLOWS) — give it a slightly

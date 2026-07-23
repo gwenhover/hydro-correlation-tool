@@ -153,7 +153,7 @@ def save_and_verify(request):
         nwm_row =  session.get(cacheTable, (nwm_final[0], nwm_final[1]))
         geo_row =  session.get(cacheTable, (geo_final[0], geo_final[1]))
         usgs_row = session.get(cacheTable, (usgs_final[0], int(usgs_final[1])))
-        if geo_row.reach_data["dates"] is None or nwm_row.reach_data["dates"] is None or usgs_row.reach_data["dates"] is None:
+        if geo_row is None or len(geo_row.reach_data["dates"]) == 0 or nwm_row is None or len(nwm_row.reach_data["dates"]) == 0 or usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
             return JsonResponse({"Error": "Missing data, check selected IDs"})
         geo_df = pd.DataFrame({
             "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
@@ -176,6 +176,12 @@ def save_and_verify(request):
         nwm_shared_dates = nwm_df.index.intersection(usgs_df.index)
         nwm_df_shared = nwm_df.loc[nwm_shared_dates]
         usgs_nwm_shared = usgs_df.loc[nwm_shared_dates]
+        if len(nwm_shared_dates) == 0:
+            print("Error: No NWM overlapping dates")
+            return JsonResponse({"Error": "No NWM overlapping dates"})
+        if len(geo_shared_dates) == 0:
+                print("Error: No GEOGLOWS overlapping dates")
+                return JsonResponse({"Error": "No GEOGLOWS overlapping dates"})
         nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
         geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
         nwm_usgs_kge_length = len(nwm_df_shared['values'])
