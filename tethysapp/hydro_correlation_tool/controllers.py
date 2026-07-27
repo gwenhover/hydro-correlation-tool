@@ -140,13 +140,60 @@ def db_get_gage(request):
     url='s_and_v'
 )
 def save_and_verify(request):
-    nwm_final  = int((request.POST.get('nwm_id')))  # Placeholder for getting the stored nwm id from user (it will be a 2 item list---network, id)
-    geo_final  = int((request.POST.get('geo_id'))) # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
-    usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-") # Placeholder for getting the stored geoglows id from user (it will be a 2 item list---network, id)
     Engine = App.get_persistent_store_database('primary_db')
     Session = sessionmaker(bind=Engine)
     session = Session() 
     try:
+        nwm_final  = int((request.POST.get('nwm_id')))
+        geo_final  = int((request.POST.get('geo_id')))
+        usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
+        nwm_kge = float((request.POST.get('nwm_kge')))
+        geo_kge = float((request.POST.get('geo_kge')))
+        nwm_kge_length = int((request.POST.get('nwm_kge_length')))
+        geo_kge_length = int((request.POST.get('geo_kge_length')))
+        new_row = session.get(hctTable, f"USGS-{usgs_final}")
+        if new_row is None:
+            print("ERROR: Could not save or validate")
+            return JsonResponse({"Error": "Could not save or validate"})
+        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final and int(new_row.geoglows_river_id) == geo_final and new_row.verification_status != 'Edited':
+            new_row.verification_status = 'Verified'
+        else:
+            new_row.verification_status = 'Edited'
+            new_row.nwm_feature_id = nwm_final
+            new_row.geoglows_river_id = geo_final
+        verification_status = new_row.verification_status
+        new_row.nwm_kge_rating = nwm_kge
+        new_row.geoglows_kge_rating = geo_kge
+        new_row.nwm_kge_shared_dates = nwm_kge_length
+        new_row.geoglows_kge_shared_dates = geo_kge_length
+        new_row.last_modified_by = request.user.username
+        new_row.last_modified_timestamp = timezone.now()
+        
+        session.commit()
+        
+    finally:
+        session.close()
+    
+    return JsonResponse({'status': verification_status})
+
+def kge_rating(simulated, observed):
+    
+    kge_array, r, alpha, beta = he.evaluator(he.kge, simulated, observed)
+    kge = float(kge_array[0])
+    return kge
+
+@controller(
+    name='compute_kge',
+    url='compute_kge_url'
+)
+def compute_kge(request):
+    Engine = App.get_persistent_store_database('primary_db')
+    Session = sessionmaker(bind=Engine)
+    session = Session() 
+    try:
+        nwm_final  = int((request.POST.get('nwm_id')))
+        geo_final  = int((request.POST.get('geo_id')))
+        usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         nwm_row =  session.get(cacheTable, ("NWM", nwm_final))
         geo_row =  session.get(cacheTable, ("GEOGLOWS", geo_final))
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
@@ -156,11 +203,11 @@ def save_and_verify(request):
             "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
         })
         nwm_df = pd.DataFrame({
-                "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
-            })
+            "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
+        })
         usgs_df = pd.DataFrame({
-                "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
-            })
+            "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
+        })
         geo_df["dates"] = pd.to_datetime(geo_df["dates"])
         nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
         usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])
@@ -177,40 +224,14 @@ def save_and_verify(request):
             print("Error: No NWM overlapping dates")
             return JsonResponse({"Error": "No NWM overlapping dates"})
         if len(geo_shared_dates) == 0:
-                print("Error: No GEOGLOWS overlapping dates")
-                return JsonResponse({"Error": "No GEOGLOWS overlapping dates"})
+            print("Error: No GEOGLOWS overlapping dates")
+            return JsonResponse({"Error": "No GEOGLOWS overlapping dates"})
         nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
         geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
         nwm_usgs_kge_length = len(nwm_df_shared['values'])
         geo_usgs_kge_length = len(geo_df_shared['values'])
-        new_row = session.get(hctTable, f"USGS-{usgs_final}")
-        if new_row is None:
-            print("ERROR: Could not save or validate")
-            return JsonResponse({"Error": "Could not save or validate"})
-        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final and int(new_row.geoglows_river_id) == geo_final:
-            new_row.verification_status = 'Verified'
-        else:
-            new_row.verification_status = 'Edited'
-            new_row.nwm_feature_id = nwm_final
-            new_row.geoglows_river_id = geo_final
-        new_row.nwm_kge_rating = nwm_usgs_kge
-        new_row.geoglows_kge_rating = geo_usgs_kge
-        new_row.nwm_kge_shared_dates = nwm_usgs_kge_length
-        new_row.geoglows_kge_shared_dates = geo_usgs_kge_length
-        new_row.last_modified_by = request.user.username
-        new_row.last_modified_timestamp = timezone.now()
-        
-        session.commit()
         
     finally:
         session.close()
-    
-    return JsonResponse({'nwm_kge': nwm_usgs_kge, 'geo_kge': geo_usgs_kge})
-
-def kge_rating(simulated, observed):
-    
-    
-    
-    kge_array, r, alpha, beta = he.evaluator(he.kge, simulated, observed)
-    kge = float(kge_array[0])
-    return kge
+        
+    return JsonResponse({'nwm_kge': nwm_usgs_kge, 'geo_kge': geo_usgs_kge, 'nwm_kge_length': nwm_usgs_kge_length, 'geo_kge_length': geo_usgs_kge_length, 'usgs_final': usgs_final})

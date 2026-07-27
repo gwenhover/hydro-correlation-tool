@@ -19,6 +19,7 @@
     var GAGES_MD_URL = "{% url 'hydro_correlation_tool:get_gage_info' %}";
     var REACH_URL = "{% url 'hydro_correlation_tool:get_reach_info' %}";
     var SAVE_URL = "{% url 'hydro_correlation_tool:save_and_verify' %}";
+    var COMPUTE_KGE_URL = "{% url 'hydro_correlation_tool:compute_kge' %}";
   </script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   {{ block.super }}
@@ -105,6 +106,69 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="window.HCT_START_TOUR()">Take the tour</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="save-modal" tabindex="-1" aria-labelledby="save-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title w-100 text-center" id="save-modal-label">Are you sure you want to save these reach IDs?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <h6><strong>Reach IDs</strong></h6>
+          <p id="usgs-id"></p>
+          <p id="nwm-id"></p>
+          <p id="geo-id"></p>
+          <p id="geo-kge"></p>
+          <p id="nwm-kge"></p>
+          <h6><strong>Hydrograph</strong></h6>
+          <p>Hydrograph here</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="save-confirm-footer" data-bs-dismiss="modal">Save and verify</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="unstaged-modal" tabindex="-1" aria-labelledby="unstaged-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title w-100 text-center" id="unstaged-modal-label">DID NOT SAVE AND VERIFY</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Please ensure a gage is selected and both reaches are staged.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="verified-modal" tabindex="-1" aria-labelledby="verified-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title w-100 text-center" id="verified-modal-label">Saved and verified!</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>You may move on to the next gage.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="fail-modal" tabindex="-1" aria-labelledby="fail-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title w-100 text-center" id="fail-modal-label">KGE Request Failed!</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Please retry the save and verification process.</p>
         </div>
       </div>
     </div>

@@ -51,6 +51,7 @@ $(function() {
     var selectedGeoglowsId = null;
     var baseGeoglowsId = null;
     var selectedUsgsId = null;
+    var usgsFeature = null;
 
     var hw_button = document.createElement('button');
     hw_button.innerHTML = 'H';
@@ -278,18 +279,62 @@ $(function() {
         
     });
         
-    /* $('#save-and-verify').on('click', function() {
-        $.post(SAVE_URL, { nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
-            if ("Error" in data){
+    var nwm_kge = null;
+    var geo_kge = null;
+    var nwm_kge_length = null;
+    var geo_kge_length = null;
 
+    $('#save-and-verify').on('click', function() {
+        if (staged_geoglows === null || staged_nwm === null || selectedUsgsId === null){
+            const modalEl = document.getElementById("unstaged-modal");
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            return
+        }
+        const modalEl = document.getElementById("save-modal");
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        $("#save-confirm-footer").prop("disabled", true);
+        $("#usgs-id").text("    USGS ID: " + selectedUsgsId);
+        $("#geo-id").text( "GEOGLOWS ID: " + staged_geoglows);
+        $("#nwm-id").text( "     NWM ID: " + staged_nwm);
+        $("#geo-kge").text("GEOGLOWS KGE Loading");
+        $("#nwm-kge").text("NWM KGE Loading");
+
+        $.post(COMPUTE_KGE_URL, { nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
+            if ("Error" in data){
+                nwm_kge = null;
+                geo_kge = null;
+                nwm_kge_length = null;
+                geo_kge_length = null;
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                const fModalEl = document.getElementById("fail-modal");
+                bootstrap.Modal.getOrCreateInstance(fModalEl).show();
             }
             else{
                 nwm_kge = data.nwm_kge
                 geo_kge = data.geo_kge
+                nwm_kge_length = data.nwm_kge_length
+                geo_kge_length = data.geo_kge_length
+                $("#save-confirm-footer").prop("disabled", false);
+                $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge);
+                $("#nwm-kge").text("     NWM KGE: " + nwm_kge);
             }
         });
-    });
-    */
+
+    }); 
+
+    $('#save-confirm-footer').on('click', function() {
+        $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
+            if ("Error" in data){
+                console.log("Failed")
+            }
+            else{
+                const modalEl = document.getElementById("verified-modal");
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                usgsFeature.set('verification_status', data.status)
+            }
+        });
+        
+    })
 
     // --- Click handling ----------------------------------------------------
 
@@ -364,6 +409,7 @@ $(function() {
             selectedNwmId = null;
             selectedGeoglowsId = null;
             selectedUsgsId = gage.get('usgs_id');
+            usgsFeature = gage;
             staged_geoglows = null;
             staged_nwm = null;
             $('#staged_id').text("Stage: ");
@@ -417,6 +463,7 @@ $(function() {
             selectedGeoglowsId = null;
             selectedNwmId = null;
             selectedUsgsId = null;
+            usgsFeature = null;
             baseNwmId = null;
             baseGeoglowsId = null;
             nwm_layer.changed();
@@ -589,3 +636,4 @@ $(function() {
     })
 
 });
+
