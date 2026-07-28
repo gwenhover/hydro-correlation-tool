@@ -234,4 +234,4 @@ def compute_kge(request):
     finally:
         session.close()
         
-    return JsonResponse({'nwm_kge': nwm_usgs_kge, 'geo_kge': geo_usgs_kge, 'nwm_kge_length': nwm_usgs_kge_length, 'geo_kge_length': geo_usgs_kge_length, 'usgs_final': usgs_final})
+    return JsonResponse({'nwm_kge': float(nwm_usgs_kge), 'geo_kge': float(geo_usgs_kge), 'nwm_kge_length': nwm_usgs_kge_length, 'geo_kge_length': geo_usgs_kge_length})

@@ -283,6 +283,8 @@ $(function() {
     var geo_kge = null;
     var nwm_kge_length = null;
     var geo_kge_length = null;
+    var nwm_color = null;
+    var geo_color = null;
 
     $('#save-and-verify').on('click', function() {
         if (staged_geoglows === null || staged_nwm === null || selectedUsgsId === null){
@@ -290,9 +292,12 @@ $(function() {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
             return
         }
+        nwm_color = null;
+        geo_color = null;
         const modalEl = document.getElementById("save-modal");
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
         $("#save-confirm-footer").prop("disabled", true);
+        $("#save-and-verify").prop("disabled", true);
         $("#usgs-id").text("    USGS ID: " + selectedUsgsId);
         $("#geo-id").text( "GEOGLOWS ID: " + staged_geoglows);
         $("#nwm-id").text( "     NWM ID: " + staged_nwm);
@@ -301,23 +306,54 @@ $(function() {
 
         $.post(COMPUTE_KGE_URL, { nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
             if ("Error" in data){
+                if (modalEl.classList.contains('show')){
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    const fModalEl = document.getElementById("fail-modal");
+                    bootstrap.Modal.getOrCreateInstance(fModalEl).show();
+                }
                 nwm_kge = null;
                 geo_kge = null;
                 nwm_kge_length = null;
                 geo_kge_length = null;
-                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-                const fModalEl = document.getElementById("fail-modal");
-                bootstrap.Modal.getOrCreateInstance(fModalEl).show();
+                $("#save-and-verify").prop("disabled", false);
             }
             else{
-                nwm_kge = data.nwm_kge
-                geo_kge = data.geo_kge
-                nwm_kge_length = data.nwm_kge_length
-                geo_kge_length = data.geo_kge_length
+                nwm_kge = data.nwm_kge;
+                geo_kge = data.geo_kge;
+                nwm_kge_length = data.nwm_kge_length;
+                geo_kge_length = data.geo_kge_length;
+                nwm_color = null;
+                geo_color = null;
+                if (nwm_kge >= .3){
+                    nwm_color = 'green';
+                } else if (-.41 <= nwm_kge){
+                    nwm_color = 'darkgoldenrod';
+                } else{
+                    nwm_color = 'red';
+                }
+                if (geo_kge >= .3){
+                    geo_color = 'green';
+                } else if (-.41 <= geo_kge){
+                    geo_color = 'darkgoldenrod';
+                } else{
+                    geo_color = 'red';
+                }
+                $("#save-and-verify").prop("disabled", false);
                 $("#save-confirm-footer").prop("disabled", false);
-                $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge);
-                $("#nwm-kge").text("     NWM KGE: " + nwm_kge);
+                $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge.toFixed(2)).css("color", geo_color);
+                $("#nwm-kge").text("     NWM KGE: " + nwm_kge.toFixed(2)).css("color", nwm_color);
             }
+        }).fail(function(){
+            if (modalEl.classList.contains('show')) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                const fModalEl = document.getElementById("fail-modal")
+                bootstrap.Modal.getOrCreateInstance(fModalEl).show();
+            }
+            $("#save-and-verify").prop("disabled", false);
+            nwm_kge = null;
+            geo_kge = null;
+            nwm_kge_length = null;
+            geo_kge_length = null;
         });
 
     }); 
@@ -325,13 +361,26 @@ $(function() {
     $('#save-confirm-footer').on('click', function() {
         $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
             if ("Error" in data){
-                console.log("Failed")
+                nwm_kge = null;
+                geo_kge = null;
+                nwm_kge_length = null;
+                geo_kge_length = null;
+                $("#save-and-verify").prop("disabled", false);
+                const fModalEl2 = document.getElementById("fail-modal-2");
+                bootstrap.Modal.getOrCreateInstance(fModalEl2).show();
             }
             else{
                 const modalEl = document.getElementById("verified-modal");
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
                 usgsFeature.set('verification_status', data.status)
             }
+        }).fail(function(){
+            nwm_kge = null;
+            geo_kge = null;
+            nwm_kge_length = null;
+            geo_kge_length = null;
+            const fModalEl = document.getElementById("fail-modal-2")
+            bootstrap.Modal.getOrCreateInstance(fModalEl).show();
         });
         
     })
