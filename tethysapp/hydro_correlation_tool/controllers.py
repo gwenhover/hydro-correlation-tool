@@ -199,15 +199,19 @@ def compute_kge(request):
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
         if geo_row is None or len(geo_row.reach_data["dates"]) == 0 or nwm_row is None or len(nwm_row.reach_data["dates"]) == 0 or usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
             return JsonResponse({"Error": "Missing data, check selected IDs"})
+        
         geo_df = pd.DataFrame({
             "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
         })
+        geo_df = geo_df.drop_duplicates(subset="dates", keep="first")
         nwm_df = pd.DataFrame({
             "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
         })
+        nwm_df = nwm_df.drop_duplicates(subset="dates", keep="first")
         usgs_df = pd.DataFrame({
             "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
         })
+        usgs_df = usgs_df.drop_duplicates(subset="dates", keep="first")
         geo_df["dates"] = pd.to_datetime(geo_df["dates"])
         nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
         usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])

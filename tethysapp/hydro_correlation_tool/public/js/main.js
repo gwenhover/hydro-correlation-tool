@@ -412,9 +412,7 @@ $(function() {
         var gage = null;
         var reach = null;
         var feature_count = 0;
-        // Walk every feature under the click and keep the FIRST of each layer.
-        // The `=== null` guards dedupe: a second overlapping gage, or a reach
-        // split across vector-tile boundaries, won't get logged twice.
+        
         ol_map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
             if (layer === gage_layer && gage === null) {
                 gage = feature;
@@ -496,10 +494,6 @@ $(function() {
             });
 
             
-
-            // Highlight this gage: clear the previous selection and add this one.
-            // A fresh Feature sharing the geometry avoids putting the same feature
-            // object into two sources.
             selection_source.clear();
             selection_source.addFeature(new ol.Feature(gage.getGeometry()));
         } else if (reach === null) {

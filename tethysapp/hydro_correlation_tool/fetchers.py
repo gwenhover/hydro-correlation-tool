@@ -28,6 +28,7 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
         print("No data")
         return {"dates": [], "values": [], "units": None}
     
+    data = data.drop_duplicates(subset="time", keep="first")
     return {
         "dates": data["time"].dt.strftime("%Y-%m-%d").tolist(),
         "values": (data["value"] * 0.0283168).tolist(),
