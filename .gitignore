@@ -13,3 +13,6 @@ preprocessing/learning*.ipynb
 # Regenerated notebook outputs — rebuild via the seeding notebooks
 preprocessing/candidates_geoglows.csv
 preprocessing/gage_vpu.csv
+
+# API token — never commit
+preprocessing/nwm_token.txt
