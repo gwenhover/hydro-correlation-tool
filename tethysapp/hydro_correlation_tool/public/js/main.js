@@ -280,6 +280,44 @@ $(function() {
     var geo_kge_length = null;
     var nwm_color = null;
     var geo_color = null;
+    var nwm_logged = null;
+    var geo_logged = null;
+    var test_msg_nwm = null;
+    var test_msg_geo = null;
+
+    document.getElementById('save-modal').addEventListener('shown.bs.modal', function() {
+
+    });
+    document.getElementById('nwm-id-input').addEventListener('keydown', function(event) {
+        if(event.key === 'Enter'){
+            nwm_logged = this.value.trim();
+            if (selectedUsgsId === null || !/^\d+$/.test(nwm_logged)){
+                return;
+            }
+            test_msg_nwm = msg_generation += 1;
+            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>')
+            load_reach(nwm_logged, 'NWM', test_msg_nwm, function(){
+                if (test_msg_nwm === msg_generation){
+                    $('#hydrograph-msg').empty()
+                }
+            })
+        }
+    });
+    document.getElementById('geo-id-input').addEventListener('keydown', function(event) {
+        if(event.key === 'Enter'){
+            geo_logged = this.value.trim();
+            if (selectedUsgsId === null || !/^\d+$/.test(geo_logged)){
+                return;
+            }
+            test_msg_geo = msg_generation += 1;
+            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>')
+            load_reach(geo_logged, 'GEOGLOWS', test_msg_geo, function(){
+                if (test_msg_geo === msg_generation){
+                    $('#hydrograph-msg').empty()
+                }
+            })
+        }
+    });
 
     $('#save-and-verify').on('click', function() {
         staged_nwm = nwmInput.value.trim();
@@ -539,65 +577,74 @@ $(function() {
             }
     
             var cur_msg = msg_generation;
-            var network = null;
-        
-            if (geoglows_layer.getVisible()) {
-                network = "GEOGLOWS";
-                selectedGeoglowsId = reach.get('station_id');
-                if (map_mode === 'geoglows'){
-                    $('#geo-id-input').val(selectedGeoglowsId);
-                }
-                geoglows_layer.changed();
-            } else {
-                network = "NWM"
-                selectedNwmId = reach.get('station_id');
-                if (map_mode === 'nwm'){
-                    $('#nwm-id-input').val(selectedNwmId);
-                }
-                nwm_layer.changed();
-            }
-            var net_class = 'reach-row-' + network.toLowerCase();
-            $('.' + net_class).remove();
-            $('.gage-meta').append(
-                '<dt class="' + net_class + '">' + network + ' Reach ID</dt>' +
-                '<dd class="' + net_class + '">' + reach.get('station_id') + '</dd>'
-            )
-            // Same staleness guard as the gage request: this reach series
-            // belongs to the currently-selected gage, so drop the response if
-            // the selection has changed by the time it arrives.
-            var reach_generation = selection_generation;
-            $.get(REACH_URL, { river_id: reach.get('station_id'), network: network }, function(data) {
-                if (reach_generation !== selection_generation) {
-                    return;
-                }
-                if (data.dates.length === 0) {
-                    if (cur_msg === msg_generation) {
-                        $('#hydrograph-msg').html('<p class="text-muted">No retrospective data for this reach.</p>');
-                        series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
-                        render_hydrograph();
-                    }
-                    return;
-                }
+            var network  = geoglows_layer.getVisible() ? "GEOGLOWS" : "NWM";
+            var river_id = reach.get('station_id');
 
-                series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
-
+            load_reach(river_id, network, cur_msg, function() {
                 feature_count -= 1;
                 if (feature_count === 0 && cur_msg === msg_generation){
                     $('#hydrograph-msg').empty();
                 }
-
-                render_hydrograph();
-
-            }).fail(function(){
-                if (reach_generation !== selection_generation || cur_msg !== msg_generation) {
-                    return;
-                }
-                $('#hydrograph-msg').html('<p class="text-muted">Could not load ' + network + ' data — try re-selecting the gage.</p>');
             });
         };
     });
 
+
+    function load_reach(river_id, network, cur_msg, on_loaded){
+        if (network === 'GEOGLOWS'){
+            selectedGeoglowsId = river_id;
+            if (map_mode === 'geoglows'){
+                $('#geo-id-input').val(selectedGeoglowsId);
+            }
+            geoglows_layer.changed()
+        } else {
+            selectedNwmId = river_id;
+            if (map_mode === 'nwm'){
+                $('#nwm-id-input').val(selectedNwmId);
+            }
+            nwm_layer.changed()
+        }
+
+        var net_class = 'reach-row-' + network.toLowerCase();
+        $('.' + net_class).remove();
+        $('.gage-meta').append(
+            '<dt class="' + net_class + '">' + network + ' Reach ID</dt>' +
+            '<dd class="' + net_class + '">' + river_id + '</dd>'
+        )
+        // Same staleness guard as the gage request: this reach series
+        // belongs to the currently-selected gage, so drop the response if
+        // the selection has changed by the time it arrives.
+        var reach_generation = selection_generation;
+        $.get(REACH_URL, { river_id: river_id, network: network }, function(data) {
+            if (reach_generation !== selection_generation) {
+                return;
+            }
+            if (data.dates.length === 0) {
+                if (cur_msg === msg_generation) {
+                    $('#hydrograph-msg').html('<p class="text-muted">No retrospective data for this reach.</p>');
+                    series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+                    render_hydrograph();
+                }
+                return;
+            }
+
+            series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+
+            on_loaded();
+
+            render_hydrograph();
+
+        }).fail(function(){
+            if (reach_generation !== selection_generation || cur_msg !== msg_generation) {
+                return;
+            }
+            $('#hydrograph-msg').html('<p class="text-muted">Could not load ' + network + ' data — try re-selecting the gage.</p>');
+        });
+
+
+    }
     function render_hydrograph() {
+
         if (Object.keys(series_state).length === 0) {
             return;
         }
