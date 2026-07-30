@@ -52,6 +52,7 @@ $(function() {
     var baseGeoglowsId = null;
     var selectedUsgsId = null;
     var usgsFeature = null;
+    var map_mode = null;
 
     var hw_button = document.createElement('button');
     hw_button.innerHTML = 'H';
@@ -222,63 +223,57 @@ $(function() {
 
     
     $('#network-nwm').on('click', function() {
+        map_mode = null;
+        $('#log-geo').text('GEO select from map');
+        $('#log-nwm').text('NWM select from map');
         nwm_layer.setVisible(true);
         geoglows_layer.setVisible(false);
-
-        // Active button = solid (btn-primary); inactive = outline.
+        
         $('#network-nwm').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#network-geoglows').removeClass('btn-primary').addClass('btn-outline-primary');
     });
 
     $('#network-geoglows').on('click', function() {
+        map_mode = null;
+        $('#log-geo').text('GEO select from map');
+        $('#log-nwm').text('NWM select from map');
         geoglows_layer.setVisible(true);
         nwm_layer.setVisible(false);
 
-        // Active button = solid (btn-primary); inactive = outline.
         $('#network-geoglows').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#network-nwm').removeClass('btn-primary').addClass('btn-outline-primary');
     });
 
-    $('#stage-reach').on('click', function() {
+    $('#log-nwm').on('click', function() {
+        map_mode = 'nwm'
 
-        if (geoglows_layer.getVisible()){
-            if (selectedGeoglowsId === null && staged_nwm === null){
-                $('#staged_id').text("Did not stage, select a reach and try again")
-                return
-            }
-            else if (selectedGeoglowsId === null){
-                $('#staged_id').text("Staged GEOGLOWS: Select a reach and try again. Staged NWM: " + staged_nwm)
-                return
-            }
-                
-            staged_geoglows = selectedGeoglowsId;
-            if (staged_nwm !== null){
-                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows + '  Staged NWM: ' + staged_nwm);
-            }
-            else{
-                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows);
-            }
-        }
-        else{
-            if (selectedNwmId === null && staged_geoglows === null){
-                $('#staged_id').text("Did not stage, select a reach and try again")
-                return
-            }
-            else if (selectedNwmId === null){
-                $('#staged_id').text("Staged GEOGLOWS: " + staged_geoglows + "Staged NWM: Select a reach and try again.")
-                return
-            }
-            staged_nwm = selectedNwmId;
-            if (staged_geoglows !== null){
-                $('#staged_id').text('Staged GEOGLOWS: ' + staged_geoglows + '  Staged NWM: ' + staged_nwm);
-            }
-            else{
-                $('#staged_id').text('Staged NWM: ' + staged_nwm);
-            }
-        }
+        nwm_layer.setVisible(true);
+        geoglows_layer.setVisible(false);
+
+        $('#network-nwm').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#network-geoglows').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#log-nwm').text('Select a reach');
+        $('#log-geo').text('GEO select from map');
         
     });
+    $('#log-geo').on('click', function() {
+        map_mode = 'geoglows'
+
+        geoglows_layer.setVisible(true);
+        nwm_layer.setVisible(false);
+
+        $('#network-geoglows').removeClass('btn-outline-primary').addClass('btn-primary');
+        $('#network-nwm').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#log-geo').text('Select a reach');
+        $('#log-nwm').text('NWM select from map');
         
+    });
+
+    var nwmInput = document.getElementById("nwm-id-input");
+    var geoInput = document.getElementById("geo-id-input");
+
+    var staged_geoglows = null;
+    var staged_nwm = null;
     var nwm_kge = null;
     var geo_kge = null;
     var nwm_kge_length = null;
@@ -287,7 +282,9 @@ $(function() {
     var geo_color = null;
 
     $('#save-and-verify').on('click', function() {
-        if (staged_geoglows === null || staged_nwm === null || selectedUsgsId === null){
+        staged_nwm = nwmInput.value.trim();
+        staged_geoglows = geoInput.value.trim();
+        if (!staged_geoglows|| !staged_nwm|| !selectedUsgsId){
             const modalEl = document.getElementById("unstaged-modal");
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
             return
@@ -315,6 +312,8 @@ $(function() {
                 geo_kge = null;
                 nwm_kge_length = null;
                 geo_kge_length = null;
+                document.getElementById('nwm-id-input').value = "";
+                document.getElementById('geo-id-input').value = "";
                 $("#save-and-verify").prop("disabled", false);
             }
             else{
@@ -354,9 +353,11 @@ $(function() {
             geo_kge = null;
             nwm_kge_length = null;
             geo_kge_length = null;
+            document.getElementById('nwm-id-input').value = "";
+            document.getElementById('geo-id-input').value = "";
         });
 
-    }); 
+    });
 
     $('#save-confirm-footer').on('click', function() {
         $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
@@ -368,13 +369,19 @@ $(function() {
                 $("#save-and-verify").prop("disabled", false);
                 const fModalEl2 = document.getElementById("fail-modal-2");
                 bootstrap.Modal.getOrCreateInstance(fModalEl2).show();
+                document.getElementById('nwm-id-input').value = "";
+                document.getElementById('geo-id-input').value = "";
             }
             else{
                 const modalEl = document.getElementById("verified-modal");
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
                 usgsFeature.set('verification_status', data.status)
+                document.getElementById('nwm-id-input').value = "";
+                document.getElementById('geo-id-input').value = "";
             }
         }).fail(function(){
+            document.getElementById('nwm-id-input').value = "";
+            document.getElementById('geo-id-input').value = "";
             nwm_kge = null;
             geo_kge = null;
             nwm_kge_length = null;
@@ -395,8 +402,6 @@ $(function() {
     var series_state = {};
     var current_unit = 'cms'
     var current_chart = 'single'
-    var staged_geoglows = null
-    var staged_nwm = null
     // Bumped every time series_state is reset (new gage selected, or selection
     // cleared). Each $.get captures the value at request time; if it changed by
     // the time the response lands, that response belongs to a previous selection
@@ -424,17 +429,22 @@ $(function() {
             // Stop early once we have one of each.
             return gage !== null && reach !== null;
         }, { hitTolerance: 5 });   // 1px stream lines are hard to hit exactly
-
-        if (gage !== null) {
+        
+        if (gage !== null && gage.get('usgs_id') !== selectedUsgsId) {
             // The geometry is in EPSG:3857 (the map projection); toLonLat converts
             // the coordinate back to [lon, lat] in 4326 for human-readable display —
             // the same transform-at-the-display-boundary rule used everywhere else.
             var lonLat = ol.proj.toLonLat(gage.getGeometry().getCoordinates());
 
+            document.getElementById('nwm-id-input').value = "";
+            document.getElementById('geo-id-input').value = "";
+            map_mode = null;
             series_state = {};
             selection_generation += 1;
             msg_generation += 1;
+            var gage_status = gage.get("verification_status")
             $('.panel-content').html(
+                '<h4 class="title" style="color: blue; display: flex; justify-content: space-between; width: 100%; margin-top: 15px">' + '<span>Selected Gage </span>' + '<span style="color: ' + statusColors[gage_status] + '; margin-right: 35px; border: 2px solid ' + statusColors[gage_status] + '; padding: 4px 12px; border-radius: 20px;">' + gage_status + '</span>' + '</h4>' +
                 '<h6 class="gage-name">' + gage.get('gage_name') + '</h6>' +
                 '<dl class="gage-meta">' +
                     '<dt>USGS ID</dt><dd>' + gage.get('usgs_id') + '</dd>' +
@@ -447,8 +457,7 @@ $(function() {
                 '<div id="hydrograph-msg"><p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p></div>' +
                 '<div id="hydrograph-1"></div>' +
                 '<div id="hydrograph-2"></div>' +
-                '<div id="hydrograph-3"></div>' +
-                '<div id="stage_button"></div>'
+                '<div id="hydrograph-3"></div>'
             );
             
             baseNwmId = gage.get('nwm_feature_id');
@@ -457,9 +466,10 @@ $(function() {
             selectedGeoglowsId = null;
             selectedUsgsId = gage.get('usgs_id');
             usgsFeature = gage;
-            staged_geoglows = null;
-            staged_nwm = null;
-            $('#staged_id').text("Stage: ");
+            $('#log-geo').text('GEO select from map');
+            $('#log-nwm').text('NWM select from map');
+            document.getElementById('nwm-id-input').value = "";
+            document.getElementById('geo-id-input').value = "";
             nwm_layer.changed();
             geoglows_layer.changed();
 
@@ -496,7 +506,11 @@ $(function() {
             
             selection_source.clear();
             selection_source.addFeature(new ol.Feature(gage.getGeometry()));
-        } else if (reach === null) {
+        } else if (gage !== null && gage.get('usgs_id') === selectedUsgsId){
+            feature_count -= 1;
+        }
+            
+        if (reach === null && gage === null) {
             $('.panel-content').html('<p class="text-muted">Select a gage to see details.</p>');
             selection_source.clear();
             // Reset the series too — the hydrograph divs are gone from the DOM,
@@ -511,26 +525,35 @@ $(function() {
             baseGeoglowsId = null;
             nwm_layer.changed();
             geoglows_layer.changed();
-            staged_geoglows = null;
-            staged_nwm = null;
-            $('#staged_id').text("Stage: ");
+            map_mode = null;
+            $('#log-geo').text('GEO select from map');
+            $('#log-nwm').text('NWM select from map');
+            document.getElementById('nwm-id-input').value = "";
+            document.getElementById('geo-id-input').value = "";
         }
 
         if (reach !== null) {
-            if (gage === null){
+            if (gage === null || gage.get('usgs_id') === selectedUsgsId){
                 msg_generation += 1;
                 $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>');
             }
+    
             var cur_msg = msg_generation;
             var network = null;
         
             if (geoglows_layer.getVisible()) {
                 network = "GEOGLOWS";
                 selectedGeoglowsId = reach.get('station_id');
+                if (map_mode === 'geoglows'){
+                    $('#geo-id-input').val(selectedGeoglowsId);
+                }
                 geoglows_layer.changed();
             } else {
                 network = "NWM"
                 selectedNwmId = reach.get('station_id');
+                if (map_mode === 'nwm'){
+                    $('#nwm-id-input').val(selectedNwmId);
+                }
                 nwm_layer.changed();
             }
             var net_class = 'reach-row-' + network.toLowerCase();
@@ -562,6 +585,7 @@ $(function() {
                 if (feature_count === 0 && cur_msg === msg_generation){
                     $('#hydrograph-msg').empty();
                 }
+
                 render_hydrograph();
 
             }).fail(function(){

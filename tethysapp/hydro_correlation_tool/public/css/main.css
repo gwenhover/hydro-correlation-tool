@@ -162,3 +162,34 @@
         transparent 44%, #c00 44%,
         #c00 56%, transparent 56%);
 }
+
+.btn-light-blue {
+  background-color: #b8dffd;
+  color: #073f94;
+  border: 1px solid #073f94;
+}
+
+
+.btn-light-blue:hover {
+  background-color: #94b0c7;
+  color: #072e68;
+}
+
+#nwm-id-input, 
+#geo-id-input {
+    color: #1a1a1a;       
+    font-style: normal;    
+    font-size: 20px;       
+    font-weight: bold;
+    text-align: center;
+}
+
+
+#nwm-id-input::placeholder, 
+#geo-id-input::placeholder {
+    font-size: 18.5px;
+    color: #9e9e9e; 
+    font-style: italic;        
+    font-weight: normal;
+    text-align: left;
+}

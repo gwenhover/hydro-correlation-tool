@@ -191,8 +191,12 @@ def compute_kge(request):
     Session = sessionmaker(bind=Engine)
     session = Session() 
     try:
-        nwm_final  = int((request.POST.get('nwm_id')))
-        geo_final  = int((request.POST.get('geo_id')))
+        try:
+            nwm_final  = int((request.POST.get('nwm_id')))
+            geo_final  = int((request.POST.get('geo_id')))
+        except:
+            print("Error: Invalid ID(s) or session connect error")
+            return JsonResponse({"Error": "Invalid ID(s) or session connect error"})
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         nwm_row =  session.get(cacheTable, ("NWM", nwm_final))
         geo_row =  session.get(cacheTable, ("GEOGLOWS", geo_final))
