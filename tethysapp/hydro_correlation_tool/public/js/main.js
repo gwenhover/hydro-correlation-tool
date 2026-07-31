@@ -53,7 +53,6 @@ $(function() {
     var selectedUsgsId = null;
     var usgsFeature = null;
     var map_mode = null;
-
     var hw_button = document.createElement('button');
     hw_button.innerHTML = 'H';
     hw_button.title = 'Show headwater streams';
@@ -224,8 +223,10 @@ $(function() {
     
     $('#network-nwm').on('click', function() {
         map_mode = null;
-        $('#log-geo').text('GEO select from map');
-        $('#log-nwm').text('NWM select from map');
+        $('#log-geo').text('Pick from map');
+        $('#log-nwm').text('Pick from map');
+        $('#log-geo').removeClass('armed');
+        $('#log-nwm').removeClass('armed');
         nwm_layer.setVisible(true);
         geoglows_layer.setVisible(false);
         
@@ -235,8 +236,10 @@ $(function() {
 
     $('#network-geoglows').on('click', function() {
         map_mode = null;
-        $('#log-geo').text('GEO select from map');
-        $('#log-nwm').text('NWM select from map');
+        $('#log-geo').text('Pick from map');
+        $('#log-nwm').text('Pick from map');
+        $('#log-geo').removeClass('armed');
+        $('#log-nwm').removeClass('armed');
         geoglows_layer.setVisible(true);
         nwm_layer.setVisible(false);
 
@@ -245,6 +248,8 @@ $(function() {
     });
 
     $('#log-nwm').on('click', function() {
+        document.getElementById('nwm-id-input').classList.remove('is-invalid');
+        document.getElementById('geo-id-input').classList.remove('is-invalid');
         map_mode = 'nwm'
 
         nwm_layer.setVisible(true);
@@ -253,19 +258,31 @@ $(function() {
         $('#network-nwm').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#network-geoglows').removeClass('btn-primary').addClass('btn-outline-primary');
         $('#log-nwm').text('Select a reach');
-        $('#log-geo').text('GEO select from map');
+        $('#log-nwm').addClass('armed');
+        $('#log-geo').text('Pick from map');
+        $('#log-geo').removeClass('armed');
+        if (selectedNwmId){
+            document.getElementById('nwm-id-input').value = selectedNwmId;
+        }
         
     });
     $('#log-geo').on('click', function() {
+        document.getElementById('nwm-id-input').classList.remove('is-invalid');
+        document.getElementById('geo-id-input').classList.remove('is-invalid');
         map_mode = 'geoglows'
-
+        
         geoglows_layer.setVisible(true);
         nwm_layer.setVisible(false);
 
         $('#network-geoglows').removeClass('btn-outline-primary').addClass('btn-primary');
         $('#network-nwm').removeClass('btn-primary').addClass('btn-outline-primary');
         $('#log-geo').text('Select a reach');
-        $('#log-nwm').text('NWM select from map');
+        $('#log-geo').addClass('armed');
+        $('#log-nwm').text('Pick from map');
+        $('#log-nwm').removeClass('armed');
+        if (selectedGeoglowsId){
+            document.getElementById('geo-id-input').value = selectedGeoglowsId;
+        }
         
     });
 
@@ -282,40 +299,56 @@ $(function() {
     var geo_color = null;
     var nwm_logged = null;
     var geo_logged = null;
-    var test_msg_nwm = null;
-    var test_msg_geo = null;
 
     document.getElementById('save-modal').addEventListener('shown.bs.modal', function() {
 
     });
     document.getElementById('nwm-id-input').addEventListener('keydown', function(event) {
+        this.classList.remove('is-invalid')
         if(event.key === 'Enter'){
             nwm_logged = this.value.trim();
-            if (selectedUsgsId === null || !/^\d+$/.test(nwm_logged)){
+            if (selectedUsgsId === null){
+                document.getElementById('nwm-id-feedback').textContent = 'Select a gage first.';
+                this.classList.add('is-invalid')
+                return;
+            } else if (!/^\d+$/.test(nwm_logged)) {
+                this.classList.add('is-invalid')
+                document.getElementById('nwm-id-feedback').textContent = 'Reach IDs are numbers only.';
                 return;
             }
-            test_msg_nwm = msg_generation += 1;
-            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>')
+            var typed = true;
+            var test_msg_nwm = msg_generation += 1;
+            msg_has_note = false;
+            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Confirming ID is valid, please wait.</p>')
             load_reach(nwm_logged, 'NWM', test_msg_nwm, function(){
-                if (test_msg_nwm === msg_generation){
+                if (test_msg_nwm === msg_generation && !msg_has_note){
                     $('#hydrograph-msg').empty()
                 }
-            })
+            }, typed)
         }
     });
     document.getElementById('geo-id-input').addEventListener('keydown', function(event) {
+        this.classList.remove('is-invalid');
         if(event.key === 'Enter'){
             geo_logged = this.value.trim();
-            if (selectedUsgsId === null || !/^\d+$/.test(geo_logged)){
+            if (selectedUsgsId === null){
+                document.getElementById('geo-id-feedback').textContent = 'Select a gage first.';
+                this.classList.add('is-invalid')
+                return;
+            } else if (!/^\d+$/.test(geo_logged)) {
+                document.getElementById('geo-id-feedback').textContent = 'Reach IDs are numbers only.';
+                this.classList.add('is-invalid')
                 return;
             }
-            test_msg_geo = msg_generation += 1;
-            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>')
+            var typed = true;
+            var test_msg_geo = msg_generation += 1;
+            msg_has_note = false;
+            $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Confirming ID is valid, please wait.</p>')
             load_reach(geo_logged, 'GEOGLOWS', test_msg_geo, function(){
-                if (test_msg_geo === msg_generation){
+                if (test_msg_geo === msg_generation && !msg_has_note){
                     $('#hydrograph-msg').empty()
                 }
-            })
+            }, typed)
         }
     });
 
@@ -416,6 +449,10 @@ $(function() {
                 usgsFeature.set('verification_status', data.status)
                 document.getElementById('nwm-id-input').value = "";
                 document.getElementById('geo-id-input').value = "";
+                $('#log-geo').removeClass('armed');
+                $('#log-nwm').removeClass('armed');
+                $('#log-geo').text('Pick from map');
+                $('#log-nwm').text('Pick from map');
             }
         }).fail(function(){
             document.getElementById('nwm-id-input').value = "";
@@ -450,12 +487,32 @@ $(function() {
     // needs its own owner. Bumped by each click that writes a spinner; only
     // callbacks holding the current value may write to or clear the div.
     var msg_generation = 0;
+    // The message div does double duty: it holds the spinner while requests are
+    // in flight, and it holds an explanation ("no data", "invalid ID") once one
+    // lands. Clearing the spinner when the last request finishes must not wipe
+    // an explanation a sibling request already wrote. Set true by every write of
+    // a real message, reset false whenever a fresh spinner goes in.
+    var msg_has_note = false;
 
     ol_map.on('singleclick', function(evt) {
+        document.getElementById('nwm-id-input').classList.remove('is-invalid');
+        document.getElementById('geo-id-input').classList.remove('is-invalid');
         var gage = null;
         var reach = null;
         var feature_count = 0;
-        
+        var new_gage = false;
+
+        // One request this click fired has finished — however it finished.
+        // Success, empty data, an error payload and a dead connection all mean
+        // "no longer waiting on it". When nothing is outstanding the spinner
+        // comes down, unless a callback left a message worth reading.
+        function feature_done(cur_msg) {
+            feature_count -= 1;
+            if (feature_count === 0 && cur_msg === msg_generation && !msg_has_note) {
+                $('#hydrograph-msg').empty();
+            }
+        }
+
         ol_map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
             if (layer === gage_layer && gage === null) {
                 gage = feature;
@@ -469,6 +526,8 @@ $(function() {
         }, { hitTolerance: 5 });   // 1px stream lines are hard to hit exactly
         
         if (gage !== null && gage.get('usgs_id') !== selectedUsgsId) {
+            feature_count = 1;
+            new_gage = true;
             // The geometry is in EPSG:3857 (the map projection); toLonLat converts
             // the coordinate back to [lon, lat] in 4326 for human-readable display —
             // the same transform-at-the-display-boundary rule used everywhere else.
@@ -480,6 +539,7 @@ $(function() {
             series_state = {};
             selection_generation += 1;
             msg_generation += 1;
+            msg_has_note = false;
             var gage_status = gage.get("verification_status")
             $('.panel-content').html(
                 '<h4 class="title" style="color: blue; display: flex; justify-content: space-between; width: 100%; margin-top: 15px">' + '<span>Selected Gage </span>' + '<span style="color: ' + statusColors[gage_status] + '; margin-right: 35px; border: 2px solid ' + statusColors[gage_status] + '; padding: 4px 12px; border-radius: 20px;">' + gage_status + '</span>' + '</h4>' +
@@ -500,12 +560,20 @@ $(function() {
             
             baseNwmId = gage.get('nwm_feature_id');
             baseGeoglowsId = gage.get('geoglows_river_id');
+            if (baseNwmId){
+                feature_count +=1;
+            }
+            if (baseGeoglowsId){
+                feature_count += 1;
+            }
             selectedNwmId = null;
             selectedGeoglowsId = null;
             selectedUsgsId = gage.get('usgs_id');
             usgsFeature = gage;
-            $('#log-geo').text('GEO select from map');
-            $('#log-nwm').text('NWM select from map');
+            $('#log-geo').text('Pick from map');
+            $('#log-nwm').text('Pick from map');
+            $('#log-geo').removeClass('armed');
+            $('#log-nwm').removeClass('armed');
             document.getElementById('nwm-id-input').value = "";
             document.getElementById('geo-id-input').value = "";
             nwm_layer.changed();
@@ -517,31 +585,46 @@ $(function() {
             var cur_msg = msg_generation;
             $.get(GAGES_MD_URL, { usgs_id: gage.get('usgs_id') }, function(data) {
                 if (gage_generation !== selection_generation) {
+                    feature_done(cur_msg);
                     return;   // user has since selected a different gage (or cleared)
                 }
                 if (data.dates.length === 0) {
                     if (cur_msg === msg_generation) {
+                        msg_has_note = true;
                         $('#hydrograph-msg').html('<p class="text-muted">No observed discharge data for this gage.</p>');
                     }
+                    feature_done(cur_msg);
                     return;
                 }
 
                 series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
 
-                feature_count -= 1;
-                if (feature_count === 0 && cur_msg === msg_generation){
-                    $('#hydrograph-msg').empty();
-                }
+                feature_done(cur_msg);
                 render_hydrograph();
 
             }).fail(function(){
                 if (gage_generation !== selection_generation || cur_msg !== msg_generation) {
+                    feature_done(cur_msg);
                     return;
                 }
+                msg_has_note = true;
                 $('#hydrograph-msg').html('<p class="text-muted">Could not load USGS data — try re-selecting the gage.</p>');
+                feature_done(cur_msg);
             });
 
-            
+            // Seeded crosswalk candidates from the tile data: load whichever
+            // exist alongside the observed series, so a gage click lands with
+            // all three hydrographs already drawn.
+            if (baseGeoglowsId){
+                load_reach(baseGeoglowsId, 'GEOGLOWS', cur_msg, function(){
+                    feature_done(cur_msg);
+                });
+            }
+            if (baseNwmId){
+                load_reach(baseNwmId, 'NWM', cur_msg, function(){
+                    feature_done(cur_msg);
+                });
+            }
             selection_source.clear();
             selection_source.addFeature(new ol.Feature(gage.getGeometry()));
         } else if (gage !== null && gage.get('usgs_id') === selectedUsgsId){
@@ -564,33 +647,32 @@ $(function() {
             nwm_layer.changed();
             geoglows_layer.changed();
             map_mode = null;
-            $('#log-geo').text('GEO select from map');
-            $('#log-nwm').text('NWM select from map');
+            $('#log-geo').text('Pick from map');
+            $('#log-nwm').text('Pick from map');
+            $('#log-geo').removeClass('armed');
+            $('#log-nwm').removeClass('armed');
             document.getElementById('nwm-id-input').value = "";
             document.getElementById('geo-id-input').value = "";
         }
 
-        if (reach !== null) {
+        if (reach !== null && !new_gage) {
             if (gage === null || gage.get('usgs_id') === selectedUsgsId){
                 msg_generation += 1;
+                msg_has_note = false;
                 $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>');
             }
-    
             var cur_msg = msg_generation;
             var network  = geoglows_layer.getVisible() ? "GEOGLOWS" : "NWM";
             var river_id = reach.get('station_id');
 
             load_reach(river_id, network, cur_msg, function() {
-                feature_count -= 1;
-                if (feature_count === 0 && cur_msg === msg_generation){
-                    $('#hydrograph-msg').empty();
-                }
+                feature_done(cur_msg);
             });
         };
     });
 
 
-    function load_reach(river_id, network, cur_msg, on_loaded){
+    function commit_reach(river_id, network){
         if (network === 'GEOGLOWS'){
             selectedGeoglowsId = river_id;
             if (map_mode === 'geoglows'){
@@ -611,21 +693,78 @@ $(function() {
             '<dt class="' + net_class + '">' + network + ' Reach ID</dt>' +
             '<dd class="' + net_class + '">' + river_id + '</dd>'
         )
+    }
+
+    function load_reach(river_id, network, cur_msg, on_loaded, typed){
+        if (!typed){
+            commit_reach(river_id, network)
+        }
         // Same staleness guard as the gage request: this reach series
         // belongs to the currently-selected gage, so drop the response if
         // the selection has changed by the time it arrives.
         var reach_generation = selection_generation;
         $.get(REACH_URL, { river_id: river_id, network: network }, function(data) {
+            var cur_nwm_box = null;
+            var cur_geo_box = null;
             if (reach_generation !== selection_generation) {
+                on_loaded()
                 return;
             }
+            if ("error" in data && data.error === 'invalid id'){
+                cur_geo_box = document.getElementById('geo-id-input').value.trim();
+                cur_nwm_box = document.getElementById('nwm-id-input').value.trim();
+                if (cur_msg === msg_generation){
+                    msg_has_note = true;
+                    $('#hydrograph-msg').html('<p class="text-muted">Invalid reach ID, please try again.</p>');
+                }
+                if (network === 'GEOGLOWS'){
+                    if (cur_geo_box === String(river_id)){
+                        document.getElementById('geo-id-input').value = "";
+                    };
+                } else {
+                    if (cur_nwm_box === String(river_id)){
+                        document.getElementById('nwm-id-input').value = "";
+                    };
+                }
+                on_loaded();
+                return;
+            }
+            else if ("error" in data && data.error === 'transient'){
+                cur_geo_box = document.getElementById('geo-id-input').value.trim();
+                cur_nwm_box = document.getElementById('nwm-id-input').value.trim();
+                if (cur_msg === msg_generation){
+                    msg_has_note = true;
+                    $('#hydrograph-msg').html('<p class="text-muted">Unknown API error, please try again.</p>');
+                }
+                if (network === 'GEOGLOWS'){
+                    if (cur_geo_box === String(river_id)){
+                        document.getElementById('geo-id-input').value = "";
+                    };
+                } else {
+                    if (cur_nwm_box === String(river_id)){
+                        document.getElementById('nwm-id-input').value = "";
+                    };
+                }
+                on_loaded();
+                return;
+            }
+
             if (data.dates.length === 0) {
+                if (typed){
+                    commit_reach(river_id, network);
+                }
                 if (cur_msg === msg_generation) {
+                    msg_has_note = true;
                     $('#hydrograph-msg').html('<p class="text-muted">No retrospective data for this reach.</p>');
                     series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
                     render_hydrograph();
                 }
+                on_loaded();
                 return;
+            }
+
+            if (typed){
+                commit_reach(river_id, network)
             }
 
             series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
@@ -636,9 +775,12 @@ $(function() {
 
         }).fail(function(){
             if (reach_generation !== selection_generation || cur_msg !== msg_generation) {
+                on_loaded();
                 return;
             }
+            msg_has_note = true;
             $('#hydrograph-msg').html('<p class="text-muted">Could not load ' + network + ' data — try re-selecting the gage.</p>');
+            on_loaded();
         });
 
 
