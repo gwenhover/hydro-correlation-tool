@@ -307,6 +307,8 @@ $(function() {
         this.classList.remove('is-invalid')
         if(event.key === 'Enter'){
             nwm_logged = this.value.trim();
+            nwm_logged = nwm_logged.replace(/^0+/, "");
+            document.getElementById('nwm-id-input').value = nwm_logged;
             if (selectedUsgsId === null){
                 document.getElementById('nwm-id-feedback').textContent = 'Select a gage first.';
                 this.classList.add('is-invalid')
@@ -331,6 +333,8 @@ $(function() {
         this.classList.remove('is-invalid');
         if(event.key === 'Enter'){
             geo_logged = this.value.trim();
+            geo_logged = geo_logged.replace(/^0+/, "");
+            document.getElementById('geo-id-input').value = geo_logged;
             if (selectedUsgsId === null){
                 document.getElementById('geo-id-feedback').textContent = 'Select a gage first.';
                 this.classList.add('is-invalid')
@@ -358,6 +362,11 @@ $(function() {
         if (!staged_geoglows|| !staged_nwm|| !selectedUsgsId){
             const modalEl = document.getElementById("unstaged-modal");
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            return
+        }
+        if (staged_nwm !== String(selectedNwmId) || staged_geoglows !== String(selectedGeoglowsId)){
+            const unsavedModalEl = document.getElementById("non-selected-modal");
+            bootstrap.Modal.getOrCreateInstance(unsavedModalEl).show();
             return
         }
         nwm_color = null;
