@@ -301,7 +301,7 @@ $(function() {
     var geo_logged = null;
 
     document.getElementById('save-modal').addEventListener('shown.bs.modal', function() {
-
+        render_hydrograph(true);
     });
     document.getElementById('nwm-id-input').addEventListener('keydown', function(event) {
         this.classList.remove('is-invalid')
@@ -794,7 +794,7 @@ $(function() {
 
 
     }
-    function render_hydrograph() {
+    function render_hydrograph(save_mode) {
 
         if (Object.keys(series_state).length === 0) {
             return;
@@ -819,6 +819,16 @@ $(function() {
 
         // The three fixed divs are always in the DOM; `used_count` records how
         // many this render actually draws into, so we can blank the rest below.
+        if (save_mode){
+            var layout = {
+                title: traces.map(function(t) { return t.name; }).join(' vs '),
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Discharge (' + current_unit + ')' }
+            };
+            Plotly.react('hydro-modal', traces, layout);
+            return;
+
+        }
         var chart_ids = ['hydrograph-1', 'hydrograph-2', 'hydrograph-3'];
         var used_count;
 
