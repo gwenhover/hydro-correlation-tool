@@ -10,7 +10,7 @@ from .model import cacheTable, hctTable
 import pandas as pd
 import hydroeval as he
 from django.utils import timezone
-
+from datetime import datetime
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -243,3 +243,26 @@ def compute_kge(request):
         session.close()
         
     return JsonResponse({'nwm_kge': float(nwm_usgs_kge), 'geo_kge': float(geo_usgs_kge), 'nwm_kge_length': nwm_usgs_kge_length, 'geo_kge_length': geo_usgs_kge_length})
+
+@controller(
+    name='export_csv',
+    url='export_csv_url'
+)
+def export_csv (request):
+    Engine = App.get_persistent_store_database('primary_db')
+    sql = 'SELECT usgs_id, gage_name, nwm_feature_id, geoglows_river_id, latitude, longitude, nwm_kge_rating, nwm_kge_shared_dates, geoglows_kge_rating, geoglows_kge_shared_dates, verification_status, last_modified_by, last_modified_timestamp FROM gage_mapping ORDER BY usgs_id;'
+    raw_conn = Engine.raw_connection()
+    try:
+        df_table = pd.read_sql(sql, raw_conn)
+        df_table['nwm_feature_id'] = df_table['nwm_feature_id'].astype("Int64")
+        df_table['geoglows_river_id'] = df_table['geoglows_river_id'].astype("Int64")
+        df_table['nwm_kge_shared_dates'] = df_table['nwm_kge_shared_dates'].astype("Int64")
+        df_table['geoglows_kge_shared_dates'] = df_table['geoglows_kge_shared_dates'].astype("Int64")
+        df_table['last_modified_timestamp'] = df_table['last_modified_timestamp'].dt.strftime('%Y-%m-%d %H:%M %Z')
+        csv_string = df_table.to_csv(index=False)
+        time_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        my_response = HttpResponse(csv_string, content_type="text/csv")
+        my_response["Content-Disposition"] = f'attachment; filename="reach_id_crosswalk_{time_now}_UTC.csv"'
+    finally:
+        raw_conn.close()
+    return my_response
