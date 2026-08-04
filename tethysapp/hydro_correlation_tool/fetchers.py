@@ -58,13 +58,14 @@ def _get_geoglows_daily_ds():
 
 
 def _geoglows_daily_series(river_id, start, end):
-    series = (
-        _get_geoglows_daily_ds()["Q"]
-        .sel(river_id=river_id)
-        .sel(time=slice(start, end))
-        .to_series()
-        .dropna()
-    )
+    series = _get_geoglows_daily_ds()["Q"]
+    try:
+        series = series.sel(river_id=river_id)
+    except KeyError as e:
+        print ("Invalid GEOGLOWS reach ID" + repr(e))
+        return (None, "error")
+    series = series.sel(time=slice(start, end)).to_series().dropna()
+    
     return (
         tuple(series.index.strftime("%Y-%m-%d")),
         tuple(float(v) for v in series),
@@ -74,9 +75,8 @@ def _geoglows_daily_series(river_id, start, end):
 def get_geoglows_retrospective(river_id, start, end):
     try:
         dates, values = _geoglows_daily_series(int(river_id), start, end)
-    except KeyError:
-        print("Invalid reach")
-        return {"dates": [], "values": [], "units": None, "error": "invalid id"}
+        if dates is None or values == "error":
+            return {"dates": [], "values": [], "units": None, "error": "invalid id"}
     except Exception as e:
         # bad/unknown river_id, network error, AWS down, etc. Log it, then
         # return the same empty shape as the USGS fetcher so the front end
