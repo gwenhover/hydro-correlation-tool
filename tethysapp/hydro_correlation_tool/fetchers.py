@@ -62,7 +62,7 @@ def _geoglows_daily_series(river_id, start, end):
     try:
         series = series.sel(river_id=river_id)
     except KeyError as e:
-        print ("Invalid GEOGLOWS reach ID" + repr(e))
+        print ("Invalid GEOGLOWS reach ID: " + repr(e))
         return (None, "error")
     series = series.sel(time=slice(start, end)).to_series().dropna()
     

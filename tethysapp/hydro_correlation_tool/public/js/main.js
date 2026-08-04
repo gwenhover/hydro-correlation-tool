@@ -387,6 +387,7 @@ $(function() {
                     bootstrap.Modal.getOrCreateInstance(modalEl).hide();
                     const fModalEl = document.getElementById("fail-modal");
                     bootstrap.Modal.getOrCreateInstance(fModalEl).show();
+                    $('#fail-text').text(data.Error);
                 }
                 nwm_kge = null;
                 geo_kge = null;

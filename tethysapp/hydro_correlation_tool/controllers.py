@@ -11,6 +11,7 @@ import pandas as pd
 import hydroeval as he
 from django.utils import timezone
 from datetime import datetime
+import math
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -170,7 +171,9 @@ def save_and_verify(request):
         new_row.last_modified_timestamp = timezone.now()
         
         session.commit()
-        
+    except Exception as e:
+        print("ERROR: Could not save or validate\nCode: " + repr(e))
+        return JsonResponse({"Error": "Could not save or validate"})
     finally:
         session.close()
     
@@ -238,7 +241,14 @@ def compute_kge(request):
         geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
         nwm_usgs_kge_length = len(nwm_df_shared['values'])
         geo_usgs_kge_length = len(geo_df_shared['values'])
-        
+        # KGE is NaN when a series has zero variance (all-zero ephemeral stream, flatlined
+        # sensor) — the correlation term divides by the standard deviation. Must be caught
+        # here: JsonResponse writes NaN as a bare `NaN` literal, which is not valid JSON and
+        # makes JSON.parse throw in the browser before the save handler ever runs.
+        if math.isnan(nwm_usgs_kge) or math.isnan(geo_usgs_kge):
+            print("Error: No KGE rating, check for constant series")
+            return JsonResponse({"Error": "No KGE rating, check for constant series"})
+
     finally:
         session.close()
         
