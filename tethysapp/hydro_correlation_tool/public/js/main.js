@@ -757,6 +757,16 @@ $(function() {
                 on_loaded();
                 return;
             }
+            else if ("error" in data && data.error === 'no data or invalid id'){
+                cur_geo_box = document.getElementById('geo-id-input').value.trim();
+                cur_nwm_box = document.getElementById('nwm-id-input').value.trim();
+                if (cur_msg === msg_generation){
+                    msg_has_note = true;
+                    $('#hydrograph-msg').html('<p class="text-muted">No retrospective data or invalid ID (undeterminable).</p>');
+                }
+                on_loaded();
+                return;
+            }
 
             if (data.dates.length === 0) {
                 if (typed){

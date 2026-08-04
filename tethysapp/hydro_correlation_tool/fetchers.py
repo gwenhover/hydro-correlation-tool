@@ -123,6 +123,6 @@ def get_nwm_retrospective(river_id, start, end, api_key):
         return {"dates": [], "values": [], "units": None, "error": "transient"}
     
     if (daily == "error"):
-        return {"dates": [], "values": [], "units": None, "error": "invalid id"}
+        return {"dates": [], "values": [], "units": None, "error": "no data or invalid id"}
         
     return {"dates": list(dates), "values": list(daily), "units": "m^3/s"}
