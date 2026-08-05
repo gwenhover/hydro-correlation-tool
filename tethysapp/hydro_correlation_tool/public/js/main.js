@@ -322,9 +322,13 @@ $(function() {
             var test_msg_nwm = msg_generation += 1;
             msg_has_note = false;
             $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Confirming ID is valid, please wait.</p>')
+            $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>')
             load_reach(nwm_logged, 'NWM', test_msg_nwm, function(){
-                if (test_msg_nwm === msg_generation && !msg_has_note){
-                    $('#hydrograph-msg').empty()
+                if (test_msg_nwm === msg_generation){
+                    if (!msg_has_note){
+                        $('#hydrograph-msg').empty();
+                    }
+                    display_kge(selectedNwmId, selectedGeoglowsId, selectedUsgsId)
                 }
             }, typed)
         }
@@ -348,9 +352,13 @@ $(function() {
             var test_msg_geo = msg_generation += 1;
             msg_has_note = false;
             $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Confirming ID is valid, please wait.</p>')
+            $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>')
             load_reach(geo_logged, 'GEOGLOWS', test_msg_geo, function(){
-                if (test_msg_geo === msg_generation && !msg_has_note){
-                    $('#hydrograph-msg').empty()
+                if (test_msg_geo === msg_generation){
+                    if (!msg_has_note){
+                        $('#hydrograph-msg').empty();
+                    }
+                    display_kge(selectedNwmId, selectedGeoglowsId, selectedUsgsId)
                 }
             }, typed)
         }
@@ -382,12 +390,12 @@ $(function() {
         $("#nwm-kge").text("NWM KGE Loading");
 
         $.post(COMPUTE_KGE_URL, { nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
-            if ("Error" in data){
+            if ("NWM Error" in data || "GEOGLOWS Error"in data || "Error" in data){
                 if (modalEl.classList.contains('show')){
                     bootstrap.Modal.getOrCreateInstance(modalEl).hide();
                     const fModalEl = document.getElementById("fail-modal");
                     bootstrap.Modal.getOrCreateInstance(fModalEl).show();
-                    $('#fail-text').text(data.Error);
+                    $('#fail-text').text("Error in one or both KGE ratings");
                 }
                 nwm_kge = null;
                 geo_kge = null;
@@ -518,8 +526,11 @@ $(function() {
         // comes down, unless a callback left a message worth reading.
         function feature_done(cur_msg) {
             feature_count -= 1;
-            if (feature_count === 0 && cur_msg === msg_generation && !msg_has_note) {
-                $('#hydrograph-msg').empty();
+            if (feature_count === 0 && cur_msg === msg_generation) {
+                if (!msg_has_note){
+                    $('#hydrograph-msg').empty();
+                }
+                display_kge(selectedNwmId, selectedGeoglowsId, selectedUsgsId)
             }
         }
 
@@ -567,7 +578,7 @@ $(function() {
                 '<div id="hydrograph-2"></div>' +
                 '<div id="hydrograph-3"></div>'
             );
-            
+            $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>')
             baseNwmId = gage.get('nwm_feature_id');
             baseGeoglowsId = gage.get('geoglows_river_id');
             if (baseNwmId){
@@ -663,6 +674,7 @@ $(function() {
             $('#log-nwm').removeClass('armed');
             document.getElementById('nwm-id-input').value = "";
             document.getElementById('geo-id-input').value = "";
+            $('#panel-kge-rating').empty()
         }
 
         if (reach !== null && !new_gage) {
@@ -670,6 +682,7 @@ $(function() {
                 msg_generation += 1;
                 msg_has_note = false;
                 $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>');
+                $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>');
             }
             var cur_msg = msg_generation;
             var network  = geoglows_layer.getVisible() ? "GEOGLOWS" : "NWM";
@@ -703,6 +716,7 @@ $(function() {
             '<dt class="' + net_class + '">' + network + ' Reach ID</dt>' +
             '<dd class="' + net_class + '">' + river_id + '</dd>'
         )
+
     }
 
     function load_reach(river_id, network, cur_msg, on_loaded, typed){
@@ -788,7 +802,6 @@ $(function() {
             }
 
             series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
-
             on_loaded();
 
             render_hydrograph();
@@ -804,6 +817,48 @@ $(function() {
         });
 
 
+    }
+    function display_kge(nwm_id, geoglows_id, usgs_id){
+        $.post(COMPUTE_KGE_URL, { nwm_id: nwm_id, geo_id: geoglows_id, usgs_id: usgs_id}, function(data){
+            if ("Error" in data){
+                $('#panel-kge-rating').empty()
+                return
+            }
+            if ("NWM Error" in data){
+                nwm_kge = data['NWM Error']
+                nwm_color = 'red'
+            } else{
+                nwm_kge = data.nwm_kge
+                if (nwm_kge >= .3){
+                    nwm_color = 'green';
+                } else if (-.41 <= nwm_kge){
+                    nwm_color = 'darkgoldenrod';
+                } else{
+                    nwm_color = 'red';
+                }
+                nwm_kge = nwm_kge.toFixed(2)
+            }
+            if ("GEOGLOWS Error" in data){
+                geo_kge = data['GEOGLOWS Error']
+                geo_color = 'red'
+            } else{
+                geo_kge = data.geo_kge
+                if (geo_kge >= .3){
+                    geo_color = 'green';
+                } else if (-.41 <= geo_kge){
+                    geo_color = 'darkgoldenrod';
+                } else{
+                    geo_color = 'red';
+                }
+                geo_kge = geo_kge.toFixed(2)
+            }
+            $('#panel-kge-rating').html(
+                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_color + '; border: 2px solid ' + nwm_color + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_kge + '</span>' + '<span style="color: ' + geo_color + '; border: 2px solid '+ geo_color +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_kge + '</span>' + '</h4>'
+            )
+
+        }).fail(function(){
+            $('#panel-kge-rating').empty()
+        });
     }
     function render_hydrograph(save_mode) {
 

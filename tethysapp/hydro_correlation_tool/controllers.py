@@ -194,65 +194,82 @@ def compute_kge(request):
     Session = sessionmaker(bind=Engine)
     session = Session() 
     try:
-        try:
-            nwm_final  = int((request.POST.get('nwm_id')))
-            geo_final  = int((request.POST.get('geo_id')))
-        except:
-            print("Error: Invalid ID(s) or session connect error")
-            return JsonResponse({"Error": "Invalid ID(s) or session connect error"})
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
-        nwm_row =  session.get(cacheTable, ("NWM", nwm_final))
-        geo_row =  session.get(cacheTable, ("GEOGLOWS", geo_final))
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
-        if geo_row is None or len(geo_row.reach_data["dates"]) == 0 or nwm_row is None or len(nwm_row.reach_data["dates"]) == 0 or usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
+        if usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
             return JsonResponse({"Error": "Missing data, check selected IDs"})
-        
-        geo_df = pd.DataFrame({
-            "dates": geo_row.reach_data["dates"], "values": geo_row.reach_data["values"]
-        })
-        geo_df = geo_df.drop_duplicates(subset="dates", keep="first")
-        nwm_df = pd.DataFrame({
-            "dates": nwm_row.reach_data["dates"], "values": nwm_row.reach_data["values"]
-        })
-        nwm_df = nwm_df.drop_duplicates(subset="dates", keep="first")
-        usgs_df = pd.DataFrame({
-            "dates": usgs_row.reach_data["dates"], "values": usgs_row.reach_data["values"]
-        })
-        usgs_df = usgs_df.drop_duplicates(subset="dates", keep="first")
-        geo_df["dates"] = pd.to_datetime(geo_df["dates"])
-        nwm_df["dates"] = pd.to_datetime(nwm_df["dates"])
-        usgs_df["dates"] = pd.to_datetime(usgs_df["dates"])
-        geo_df = geo_df.set_index("dates")
-        nwm_df = nwm_df.set_index("dates")
-        usgs_df = usgs_df.set_index("dates")
-        geo_shared_dates = geo_df.index.intersection(usgs_df.index)
-        geo_df_shared = geo_df.loc[geo_shared_dates]
-        usgs_geo_shared = usgs_df.loc[geo_shared_dates]
-        nwm_shared_dates = nwm_df.index.intersection(usgs_df.index)
-        nwm_df_shared = nwm_df.loc[nwm_shared_dates]
-        usgs_nwm_shared = usgs_df.loc[nwm_shared_dates]
-        if len(nwm_shared_dates) == 0:
-            print("Error: No NWM overlapping dates")
-            return JsonResponse({"Error": "No NWM overlapping dates"})
-        if len(geo_shared_dates) == 0:
-            print("Error: No GEOGLOWS overlapping dates")
-            return JsonResponse({"Error": "No GEOGLOWS overlapping dates"})
-        nwm_usgs_kge = kge_rating(nwm_df_shared['values'].to_numpy(), usgs_nwm_shared['values'].to_numpy())
-        geo_usgs_kge = kge_rating(geo_df_shared['values'].to_numpy(), usgs_geo_shared['values'].to_numpy())
-        nwm_usgs_kge_length = len(nwm_df_shared['values'])
-        geo_usgs_kge_length = len(geo_df_shared['values'])
-        # KGE is NaN when a series has zero variance (all-zero ephemeral stream, flatlined
-        # sensor) — the correlation term divides by the standard deviation. Must be caught
-        # here: JsonResponse writes NaN as a bare `NaN` literal, which is not valid JSON and
-        # makes JSON.parse throw in the browser before the save handler ever runs.
-        if math.isnan(nwm_usgs_kge) or math.isnan(geo_usgs_kge):
-            print("Error: No KGE rating, check for constant series")
-            return JsonResponse({"Error": "No KGE rating, check for constant series"})
 
+        usgs_df = load_series(usgs_row)
+        
+        nwm = compute_one_kge(session, 'NWM', request.POST.get('nwm_id'), usgs_df)
+        geoglows = compute_one_kge(session, 'GEOGLOWS', request.POST.get('geo_id'), usgs_df)
+
+        if ("NWM Error" not in nwm):
+            nwm_kge = float(nwm['kge'])
+            nwm_length = nwm['length']
+        else:
+            nwm_kge = None
+
+        if ("GEOGLOWS Error" not in geoglows):
+            geo_kge = float(geoglows['kge'])
+            geo_length = geoglows['length']
+        else:
+            geo_kge = None
+
+        if nwm_kge is None and geo_kge is None:
+            return JsonResponse(nwm | geoglows)
+        if nwm_kge is None:
+            return JsonResponse({'geo_kge': geo_kge, 'geo_kge_length': geo_length} | nwm)
+        if geo_kge is None:
+            return JsonResponse({'nwm_kge': nwm_kge, 'nwm_kge_length': nwm_length} | geoglows)
+        
     finally:
         session.close()
         
-    return JsonResponse({'nwm_kge': float(nwm_usgs_kge), 'geo_kge': float(geo_usgs_kge), 'nwm_kge_length': nwm_usgs_kge_length, 'geo_kge_length': geo_usgs_kge_length})
+    return JsonResponse({'nwm_kge': float(nwm_kge), 'geo_kge': float(geo_kge), 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
+
+
+
+def load_series(row):
+    df = pd.DataFrame({"dates": row.reach_data["dates"], "values": row.reach_data["values"]})
+    df = df.drop_duplicates(subset="dates", keep="first")
+    df["dates"] = pd.to_datetime(df["dates"])
+    df = df.set_index("dates")
+    return df
+
+
+def compute_one_kge(session, network, raw_id, usgs_df):
+    try:
+        try:
+            if not raw_id:
+                print(f"{network} Error: No rating")
+                return {f"{network} Error": "No rating"}
+            id = int(raw_id)
+        except:
+            print(f"{network} Error: Invalid {network} ID or session connect error")
+            return {f"{network} Error": f"Invalid {network} ID or session connect error"}
+        row =  session.get(cacheTable, (network, id))
+        if row is None or len(row.reach_data["dates"]) == 0:
+            return {f"{network} Error": f"Missing data, check {network} ID"}
+        df = load_series(row)
+        shared_dates = df.index.intersection(usgs_df.index)
+        df_shared = df.loc[shared_dates]
+        usgs_df_shared = usgs_df.loc[shared_dates]
+        if len(shared_dates) == 0:
+            print(f"{network} Error: No {network} overlapping dates")
+            return {f"{network} Error": f"No {network} overlapping dates"}
+        kge = kge_rating(df_shared['values'].to_numpy(), usgs_df_shared['values'].to_numpy())
+        kge_length = len(df_shared['values'])
+        if math.isnan(kge):
+            print(f"{network} Error: No {network} KGE rating, check for constant series")
+            return {f"{network} Error": f"No KGE {network} rating, check for constant series"}
+    except Exception as e:
+        print (f"{network} Error: " + repr(e))
+        return {f"{network} Error": f"Unknown {network} Error"}
+    
+    return {"kge": kge, "length": kge_length}
+
+
 
 @controller(
     name='export_csv',
