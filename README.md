@@ -1,76 +1,137 @@
 # Hydro Correlation Tool
+<img width="1911" height="942" alt="image" src="https://github.com/user-attachments/assets/47e1ab98-8f7a-4c6d-82e2-923c897033c2" />
 
-> **Status: in active development (Week 4 of 10).** This README grows as the app is built — some sections describe features that don't exist yet and are marked accordingly.
-
-A single-user scientific workbench (Tethys Platform app) for building and maintaining a high-quality cross-mapping table that links each active **USGS streamflow gage** to its corresponding **NWM v3 reach** (`feature_id`) and **GEOGLOWS v2 river** (`river_id`).
+A (currently) single-user scientific workbench (Tethys Platform app) for building and maintaining a high-quality cross-mapping table that links each active **USGS streamflow gage** to its corresponding **NWM v3 reach** (`feature_id`) and **GEOGLOWS v2 river** (`river_id`).
 
 Because these three datasets use different IDs and geometries for the same rivers, a curated cross-mapping table is needed to connect them. The tool works in two stages:
 
-1. **Offline seeding** — a standalone Python/GeoPandas notebook produces a first-pass mapping (~70% accurate) by spatially matching gages to reaches.
-2. **Interactive verification** — a researcher reviews each gage in the web app: inspecting hydrographs, correcting wrong reach assignments (by typing an ID or clicking the correct reach on the map), and marking each record verified. The corrected, human-verified table is the deliverable.
+1. **Offline seeding** — a standalone Python/GeoPandas notebook produces a first-pass seed (~70% accurate) by spatially matching gages to reaches.
+2. **Interactive verification** — a researcher reviews each gage in the web app: inspecting hydrographs, correcting wrong reach assignments (by typing an ID or clicking the correct reach on the map), and marking each record verified. The corrected, human-verified table is the deliverable and is exportable as a csv through the app.
 
 ## Tech stack
 
-- **Tethys Platform** (Django-based) with PostgreSQL/PostGIS *(database arrives Week 7)*
+- **Tethys Platform** (Django-based) with PostgreSQL/PostGIS
 - **OpenLayers** for the map (via the Tethys MapView gizmo)
 - **MapBox Vector Tiles** for the NWM / GEOGLOWS stream networks
-- **Plotly** for hydrographs *(Weeks 5–6)*
+- **Plotly** for hydrographs, comes from a CDN
 - **Bootstrap 5** + jQuery
 
 ## Local setup
 
 > Confirm the exact commands for your Tethys version (the flow below is the standard shape).
 
-1. Install Tethys and create/activate its conda environment.
-2. From the repo root, install the app in develop mode:
+### Prerequisites
+1. Tethys Platform >= 4.0.0 (installer creates a conda environment)
+
+### Steps
+1. Clone the repo and [activate your environment](https://docs.tethysplatform.org/en/stable/supplementary/virtual_environment.html#activate-environment).
+   ```
+   conda activate <your environment>
+   ```
+2. Configure and start the Tethys database:
+   ```
+   tethys db configure (first  time only)
+   tethys db start (subsequent times)
+   
+   ```
+3. Install the app in develop mode:
    ```
    tethys install -d
    ```
-3. Start the dev server and open the portal:
+4. Set the API keys:
    ```
-   tethys manage start
+   tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token>
+   tethys app_settings set hydro_correlation_tool "USGS API Token"  <token>
+   tethys app_settings set hydro_correlation_tool "NWM API Token"   <token>
    ```
-   The app lives at `http://localhost:8000/apps/hydro-correlation-tool/`.
-4. **Set the MapBox token** (required, or stream tiles fail with 401):
-   Portal → **Settings** → the app's **Custom Settings** → paste your MapBox public token into **`MapBox PK Token`** and save.
+5. Create tables + seed ~9,100 rows (slow, don't Ctrl-C):
+   ```
+   tethys syncstores hydro_correlation_tool
+   ```
+6. Start the portal
+   ```
+   tethys start
+   ```
+7. Navigate to http://localhost:8000/apps/hydro-correlation-tool/ in a browser to see the app
 
-## Gotchas
+## Troubleshooting
+- **Database showing "on port None.."?** If tethys db start reports on port None, your portal_config.yml is missing PORT under DATABASES.default. Add it, or start the cluster directly:
+  ```
+  pg_ctl -D <db_dir>/data -l <db_dir>/logfile -o "-p <port>" start
+  ```
 
 - **JS/CSS edits not showing up?** This install serves *collected* static files, so a browser refresh isn't enough — run:
   ```
   tethys manage collectstatic
   ```
   then hard-refresh (Ctrl+Shift+R).
-- **Stream tiles blank / 401?** The MapBox token custom setting isn't set (see setup step 4).
+- **Stream tiles blank / 401?** The custom settings are not set or are set incorrectly (see setup step 4).
 - **Projection convention:** all *data* stays in **EPSG:4326** (gage GeoJSON, coordinates); the *map view* runs in **EPSG:3857** (required by the vector tiles). Transform 4326 → 3857 only at the display boundary.
+- **Connection refused... port 5436** Database isn't running (doesn't survive a wsl reboot)
 
-## Data & preprocessing
+## Usage
+A user verifies a gage through this process:
+1. Click on a red (unverified) gage -> see the gage + seeded reaches data on the right panel.
+2. Inspect the reaches' locations on the map, relative to the gage, as well as the hydrograph and kge data mentioned above
+3. Test other reaches (if necessary) and find the best fit for this particular gage
+4. Type the corresponding IDs into the box above "Save and Verify", or pick the reaches off the map (recommended)
+5. Click "Save and Verify"
+6. Confirm
+7. Move to the next gage
 
+**Relevant information and definitions**:
+- Each gage can have one of these statuses:
+   - Verified: User confirmed, preprocessing seed got both the IDs correct
+   - Edited: User confirmed, preprocessing seed got at least one ID incorrect
+   - Unverified: Not user confirmed
+- KGE: Stands for Kling Gupta Efficiency rating and is a statistical metric for evaluating how well a model lines up with observed data. This app uses a color system outlined below:
+   - Green (good): KGE ≥ 0.3 
+   - Yellow (moderate): -0.41 ≤ KGE < 0.3
+   - Red (poor): KGE < -0.41
+   
+   Note that the KGE rating is not the final factor in deciding if a reach corresponds to a certain gage. Sometimes a model vastly overpredicts but still has the correct timing, which could lead to a red KGE score while being the correct reach.
+- Pink highlighted reaches are the seeded best guess of the preprocessing notebook, yellow reaches are currently selected.
+
+## Output
+The output and end-goal of this app is a table that contains the corresponding USGS, NWM, and GEOGLOWS reach IDs. The table currently has 14 columns:
+```
+    usgs_id
+    gage_name
+    latitude
+    longitude
+    geom
+    nwm_feature_id
+    nwm_kge_rating
+    nwm_kge_shared_dates
+    geoglows_river_id
+    geoglows_kge_rating
+    geoglows_kge_shared_dates
+    verification_status
+    last_modified_by
+    last_modified_timestamp
+```
+
+An example row looks like:
+<img width="1302" height="19" alt="image" src="https://github.com/user-attachments/assets/14ad02e4-7ec2-44ee-a336-908d810224ce" />
+
+## Known bugs and future work
+
+**Future Work (in progress)**
+- Add a "snap to next gage" feature
+- Add a "review table" below the map
+- Cache all seeded NWM and GEOGLOWS data
+- Map legend
+- Update the tour that currently runs, as it is out of date
+
+**Bugs and Limitations (being worked on)**
+- First time fetching NWM data can take up to 45 seconds
+- Single user app -- cannot currently handle multiple users caching or saving at the same time
+
+## Development notes
+- public/data/seed.csv is what ```syncstores``` loads into the DB
 - The gage layer loads from `tethysapp/hydro_correlation_tool/public/data/merged_gages.geojson` (~9,100 active CONUS gages).
 - Regenerate that file with the notebook in [`preprocessing/`](preprocessing/), which merges the USGS gage list with reach IDs, filters to CONUS, and prefixes each id as `USGS-…`.
 
-## Roadmap
-
-| Week | Deliverable | Status |
-|------|-------------|--------|
-| 1 | Local app + full-screen CONUS map | ✅ Done |
-| 2 | Two-pane layout + ~9,000 clickable USGS gages | ✅ Done |
-| 3 | NWM stream network (MapBox tiles) + network/basemap toggles | ✅ Done |
-| 4 | Click a gage → metadata panel + highlight ring | ✅ Done |
-| 5 | Observed USGS daily hydrograph (Plotly) | ⬜ Planned |
-| 6 | Full three-series hydrograph (USGS + NWM + GEOGLOWS) + unit/chart toggles | ⬜ Planned |
-| 7 | PostGIS database + seeded ~70% mapping, gages colored by status | ⬜ Planned |
-| 8 | Edit workflow: type or pick-from-map, Save & Verify, status recolor | ⬜ Planned |
-| 9 | Export to CSV, headwater filtering, performance polish | ⬜ Planned |
-| 10 | QA, data-validation audit, deployment | ⬜ Planned |
-
-## Not yet implemented
-
-- Persistent database / schema (Week 7)
-- Hydrograph data fetchers — USGS `dataretrieval`, NWM BigQuery, GEOGLOWS (Weeks 5–6); will require API keys/endpoints
-- Editing, verification, and CSV export (Weeks 8–9)
-- Deployment (Week 10)
-
 ## Project context
 
-Part of a CIROH / BYU / Aquaveo effort. PI: Dan Ames · Lead architect: Sudip · Implementation: Gwen Hover.
+Part of a CIROH / BYU / Aquaveo effort. PI: Dan Ames · Lead architect: Sudip Pathak· Implementation: Gwen Hover.
