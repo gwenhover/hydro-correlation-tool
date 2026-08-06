@@ -1,5 +1,6 @@
 # Hydro Correlation Tool
-<img width="1911" height="942" alt="image" src="https://github.com/user-attachments/assets/47e1ab98-8f7a-4c6d-82e2-923c897033c2" />
+![Hydro Correlation Tool — CONUS map with gage panel](docs/README_Picture.png)
+
 
 A (currently) single-user scientific workbench (Tethys Platform app) for building and maintaining a high-quality cross-mapping table that links each active **USGS streamflow gage** to its corresponding **NWM v3 reach** (`feature_id`) and **GEOGLOWS v2 river** (`river_id`).
 
@@ -112,7 +113,7 @@ The output and end-goal of this app is a table that contains the corresponding U
 ```
 
 An example row looks like:
-<img width="1302" height="19" alt="image" src="https://github.com/user-attachments/assets/14ad02e4-7ec2-44ee-a336-908d810224ce" />
+![Hydro Correlation Tool — CONUS map with gage panel](docs/README_Picture_2.png)
 
 ## Known bugs and future work
 
