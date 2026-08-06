@@ -19,10 +19,8 @@ Because these three datasets use different IDs and geometries for the same river
 
 ## Local setup
 
-> Confirm the exact commands for your Tethys version (the flow below is the standard shape).
-
 ### Prerequisites
-1. Tethys Platform >= 4.0.0 (installer creates a conda environment)
+1. [Tethys Platform](https://docs.tethysplatform.org/en/stable/installation.html#download-and-install-the-tethys-platform-package) >= 4.0.0 (installer creates a conda environment)
 
 ### Steps
 1. Clone the repo and [activate your environment](https://docs.tethysplatform.org/en/stable/supplementary/virtual_environment.html#activate-environment).
@@ -31,8 +29,8 @@ Because these three datasets use different IDs and geometries for the same river
    ```
 2. Configure and start the Tethys database:
    ```
-   tethys db configure (first  time only)
-   tethys db start (subsequent times)
+   tethys db configure # First time only
+   tethys db start # Subsequent times
    
    ```
 3. Install the app in develop mode:
@@ -41,8 +39,8 @@ Because these three datasets use different IDs and geometries for the same river
    ```
 4. Set the API keys:
    ```
-   tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token>
-   tethys app_settings set hydro_correlation_tool "USGS API Token"  <token>
+   tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token> 
+   tethys app_settings set hydro_correlation_tool "USGS API Token"  <token> (optional)
    tethys app_settings set hydro_correlation_tool "NWM API Token"   <token>
    ```
 5. Create tables + seed ~9,100 rows (slow, don't Ctrl-C):
