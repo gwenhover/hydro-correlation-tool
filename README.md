@@ -24,12 +24,17 @@ Because these three datasets use different IDs and geometries for the same river
 1. [Tethys Platform](https://docs.tethysplatform.org/en/stable/installation.html#download-and-install-the-tethys-platform-package) >= 4.0.0 (installer creates a conda environment)
 
 ### Steps
-1. Clone the repo and [activate your environment](https://docs.tethysplatform.org/en/stable/supplementary/virtual_environment.html#activate-environment).
-   ```
+1. Clone the repo and activate your [Tethys environment](https://docs.tethysplatform.org/en/stable/supplementary/virtual_environment.html#activate-environment):
+   ```bash
+   git clone https://github.com/gwenhover/hydro-correlation-tool.git
+   cd hydro-correlation-tool
    conda activate <your environment>
    ```
+   All remaining commands run from inside this directory.
+
 2. Configure and start the Tethys database:
    ```bash
+   tethys settings --set DATABASES.default.ENGINE django.db.backends.postgresql
    tethys settings --set DATABASES.default.DIR psql --set DATABASES.default.PORT 5436
    tethys db configure
    ```
