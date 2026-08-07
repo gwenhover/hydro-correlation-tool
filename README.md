@@ -28,11 +28,13 @@ Because these three datasets use different IDs and geometries for the same river
    conda activate <your environment>
    ```
 2. Configure and start the Tethys database:
+   ```bash
+   tethys settings --set DATABASES.default.DIR psql --set DATABASES.default.PORT 5436
+   tethys db configure
    ```
-   tethys db configure # First time only
-   tethys db start # Subsequent times
-   
-   ```
+   `tethys db configure` creates, initializes, and starts the bundled PostgreSQL cluster.
+   On later sessions the database won't be running — start it with `tethys db start`.
+
 3. Install the app in develop mode:
    ```
    tethys install -d
