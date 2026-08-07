@@ -18,7 +18,7 @@ Because these three datasets use different IDs and geometries for the same river
 - **Bootstrap 5** + jQuery
 - **NWM retrospective, USGS, and GEOGLOWS APIs**
 
-## Local setup
+## These instructions are for developers running their own instance. Curators don't install anything, they get an account on the hosted portal.
 
 ### Prerequisites
 1. [Tethys Platform](https://docs.tethysplatform.org/en/stable/installation.html#download-and-install-the-tethys-platform-package) >= 4.0.0 (installer creates a conda environment)
@@ -41,10 +41,14 @@ Because these three datasets use different IDs and geometries for the same river
    `tethys db configure` creates, initializes, and starts the bundled PostgreSQL cluster.
    On later sessions the database won't be running — start it with `tethys db start`.
 
-3. Install the app in develop mode:
+3. Create a database service for the app and install it:
+   ```bash
+   tethys services create persistent -n hct_postgre -c tethys_super:pass@localhost:5436
+   tethys install -d -q
+   tethys link persistent:hct_postgre hydro_correlation_tool:ps_database:primary_db
    ```
-   tethys install -d
-   ```
+   `tethys_super`/`pass` are the Tethys defaults created by `tethys db configure`.
+
 4. Set the API keys:
    ```
    tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token> 
@@ -60,6 +64,8 @@ Because these three datasets use different IDs and geometries for the same river
    tethys start
    ```
 7. Navigate to http://localhost:8000/apps/hydro-correlation-tool/ in a browser to see the app
+8. Log in with username 'admin' and password 'pass'
+9. Click 'register' in the top right corner and create an account
 
 ## Troubleshooting
 - **Database showing "on port None.."?** If tethys db start reports on port None, your portal_config.yml is missing PORT under DATABASES.default. Add it, or start the cluster directly:
@@ -95,9 +101,10 @@ A user verifies a gage through this process:
    - Green (good): KGE ≥ 0.3 
    - Yellow (moderate): -0.41 ≤ KGE < 0.3
    - Red (poor): KGE < -0.41
-   
+
    Note that the KGE rating is not the final factor in deciding if a reach corresponds to a certain gage. Sometimes a model vastly overpredicts but still has the correct timing, which could lead to a red KGE score while being the correct reach.
 - Pink highlighted reaches are the seeded best guess of the preprocessing notebook, yellow reaches are currently selected.
+- Multi-user attribution. The app records the logged-in username in last_modified_by on every save. If several curators share a portal, give each their own account rather than sharing admin — otherwise the column can't tell you who verified what. On our portal that's done with ENABLE_OPEN_SIGNUP plus ENABLE_RESTRICTED_APP_ACCESS, with users added to a Curators group that grants access to this app. Accounts provide attribution, not concurrency safety — see Known limitations.
 
 ## Output
 The output and end-goal of this app is a table that contains the corresponding USGS, NWM, and GEOGLOWS reach IDs. The table currently has 14 columns:
