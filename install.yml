@@ -13,6 +13,7 @@ requirements:
       - conda-forge
     packages:
       - geopandas
+      - postgis
 
   pip:
     - dataretrieval
