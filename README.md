@@ -2,7 +2,7 @@
 ![Hydro Correlation Tool — CONUS map with gage panel](docs/README_Picture.png)
 
 
-A (currently) single-user scientific workbench (Tethys Platform app) for building and maintaining a high-quality cross-mapping table that links each active **USGS streamflow gage** to its corresponding **NWM v3 reach** (`feature_id`) and **GEOGLOWS v2 river** (`river_id`).
+A scientific workbench (Tethys Platform app) for building and maintaining a high-quality cross-mapping table that links each active **USGS streamflow gage** to its corresponding **NWM v3 reach** (`feature_id`) and **GEOGLOWS v2 river** (`river_id`). Note that multiple users can use the app, but caching data and editing the database are not safe for multi-user access yet.
 
 Because these three datasets use different IDs and geometries for the same rivers, a curated cross-mapping table is needed to connect them. The tool works in two stages:
 
@@ -18,7 +18,8 @@ Because these three datasets use different IDs and geometries for the same river
 - **Bootstrap 5** + jQuery
 - **NWM retrospective, USGS, and GEOGLOWS APIs**
 
-## These instructions are for developers running their own instance. Curators don't install anything, they get an account on the hosted portal.
+## Developer Setup
+These instructions are for developers running their own instance. Curators don't install anything, they get an account on the hosted portal.
 
 ### Prerequisites
 1. [Tethys Platform](https://docs.tethysplatform.org/en/stable/installation.html#download-and-install-the-tethys-platform-package) >= 4.0.0 (installer creates a conda environment)
@@ -51,9 +52,9 @@ Because these three datasets use different IDs and geometries for the same river
 
 4. Set the API keys:
    ```
-   tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token> 
-   tethys app_settings set hydro_correlation_tool "USGS API Token"  <token> (optional)
-   tethys app_settings set hydro_correlation_tool "NWM API Token"   <token>
+   tethys app_settings set hydro_correlation_tool "MapBox PK Token" <token> # Required, comes from BYU, reach out to Dan Ames or Jerson Garcia for access
+   tethys app_settings set hydro_correlation_tool "NWM API Token"   <token> # Required, comes from BYU, reach out to Dan Ames or Sujan Chandra Mondol for access
+   tethys app_settings set hydro_correlation_tool "USGS API Token"  <token> # Optional, can request access at https://api.waterdata.usgs.gov/signup/
    ```
 5. Create tables + seed ~9,100 rows (slow, don't Ctrl-C):
    ```
@@ -65,9 +66,9 @@ Because these three datasets use different IDs and geometries for the same river
    ```
 7. Navigate to http://localhost:8000/apps/hydro-correlation-tool/ in a browser to see the app
 8. Log in with username 'admin' and password 'pass'
-9. Click 'register' in the top right corner and create an account
 
 ## Troubleshooting
+- **Database unable to start due to taken port?** Run `ss -ltn | grep :5436` to check if the port is available. If not, pick a different one in the 1024–49151 range and re-run.
 - **Database showing "on port None.."?** If tethys db start reports on port None, your portal_config.yml is missing PORT under DATABASES.default. Add it, or start the cluster directly:
   ```
   pg_ctl -D <db_dir>/data -l <db_dir>/logfile -o "-p <port>" start
@@ -81,6 +82,9 @@ Because these three datasets use different IDs and geometries for the same river
 - **Stream tiles blank / 401?** The custom settings are not set or are set incorrectly (see setup step 4).
 - **Projection convention:** all *data* stays in **EPSG:4326** (gage GeoJSON, coordinates); the *map view* runs in **EPSG:3857** (required by the vector tiles). Transform 4326 → 3857 only at the display boundary.
 - **Connection refused... port 5436** Database isn't running (doesn't survive a wsl reboot)
+  
+## Correctness check
+Ensure that the map loads with gages (red, yellow, and green dots), blue stream lines follow the maps on rivers (not perfectly), and a hydrograph appears upon clicking a gage.
 
 ## Usage
 A user verifies a gage through this process:
@@ -105,7 +109,6 @@ A user verifies a gage through this process:
    Note that the KGE rating is not the final factor in deciding if a reach corresponds to a certain gage. Sometimes a model vastly overpredicts but still has the correct timing, which could lead to a red KGE score while being the correct reach.
 - Pink highlighted reaches are the seeded best guess of the preprocessing notebook, yellow reaches are currently selected.
 - Multi-user attribution. The app records the logged-in username in last_modified_by on every save. If several curators share a portal, give each their own account rather than sharing admin — otherwise the column can't tell you who verified what. On our portal that's done with ENABLE_OPEN_SIGNUP plus ENABLE_RESTRICTED_APP_ACCESS, with users added to a Curators group that grants access to this app. Accounts provide attribution, not concurrency safety — see Known limitations.
-
 ## Output
 The output and end-goal of this app is a table that contains the corresponding USGS, NWM, and GEOGLOWS reach IDs. The table currently has 14 columns:
 ```
@@ -126,7 +129,7 @@ The output and end-goal of this app is a table that contains the corresponding U
 ```
 
 An example row looks like:
-![Hydro Correlation Tool — CONUS map with gage panel](docs/README_Picture_2.png)
+![Example Rainbow CSV verified row](docs/README_Picture_2.png)
 
 ## Known bugs and future work
 
@@ -139,7 +142,7 @@ An example row looks like:
 
 **Bugs and Limitations (being worked on)**
 - First time fetching NWM data can take up to 45 seconds
-- Single user app -- cannot currently handle multiple users caching or saving at the same time
+- Cannot currently handle multiple users caching or saving at the same time
 
 ## Development notes
 - public/data/seed.csv is what ```syncstores``` loads into the DB
