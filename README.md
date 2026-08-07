@@ -16,6 +16,7 @@ Because these three datasets use different IDs and geometries for the same river
 - **MapBox Vector Tiles** for the NWM / GEOGLOWS stream networks
 - **Plotly** for hydrographs, comes from a CDN
 - **Bootstrap 5** + jQuery
+- **NWM retrospective, USGS, and GEOGLOWS APIs**
 
 ## Local setup
 
