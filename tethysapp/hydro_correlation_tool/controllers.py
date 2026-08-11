@@ -148,8 +148,16 @@ def save_and_verify(request):
         nwm_final  = int((request.POST.get('nwm_id')))
         geo_final  = int((request.POST.get('geo_id')))
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
-        nwm_kge = float((request.POST.get('nwm_kge')))
-        geo_kge = float((request.POST.get('geo_kge')))
+        nwm_kge = (request.POST.get('nwm_kge'))
+        geo_kge = (request.POST.get('geo_kge'))
+        if nwm_kge:
+            nwm_kge = float(nwm_kge)
+        else:
+            nwm_kge = None
+        if geo_kge:
+            geo_kge = float(geo_kge)
+        else:
+            geo_kge = None
         nwm_kge_length = int((request.POST.get('nwm_kge_length')))
         geo_kge_length = int((request.POST.get('geo_kge_length')))
         new_row = session.get(hctTable, f"USGS-{usgs_final}")
@@ -193,6 +201,8 @@ def compute_kge(request):
     Engine = App.get_persistent_store_database('primary_db')
     Session = sessionmaker(bind=Engine)
     session = Session() 
+    nwm_error = False
+    geo_error = False
     try:
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
@@ -205,23 +215,35 @@ def compute_kge(request):
         geoglows = compute_one_kge(session, 'GEOGLOWS', request.POST.get('geo_id'), usgs_df)
 
         if ("NWM Error" not in nwm):
-            nwm_kge = float(nwm['kge'])
+            if (nwm['kge'] is not None):
+                nwm_kge = float(nwm['kge'])
+            else:
+                nwm_kge = nwm['kge']
             nwm_length = nwm['length']
         else:
-            nwm_kge = None
-
+            nwm_error = True
+            
         if ("GEOGLOWS Error" not in geoglows):
-            geo_kge = float(geoglows['kge'])
+            if (geoglows['kge'] is not None):
+                geo_kge = float(geoglows['kge'])
+            else:
+                geo_kge = geoglows['kge']
             geo_length = geoglows['length']
         else:
-            geo_kge = None
+            geo_error = True
 
-        if nwm_kge is None and geo_kge is None:
+        if (nwm_error and geo_error):
             return JsonResponse(nwm | geoglows)
-        if nwm_kge is None:
+        if (nwm_error):
             return JsonResponse({'geo_kge': geo_kge, 'geo_kge_length': geo_length} | nwm)
-        if geo_kge is None:
+        if (geo_error):
             return JsonResponse({'nwm_kge': nwm_kge, 'nwm_kge_length': nwm_length} | geoglows)
+        if nwm_kge is None and geo_kge is None:
+            return JsonResponse({'nwm_kge': nwm_kge, 'geo_kge': geo_kge, 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
+        if nwm_kge is None:
+            return JsonResponse({'nwm_kge': nwm_kge, 'geo_kge': float(geo_kge), 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
+        if geo_kge is None:
+            return JsonResponse({'nwm_kge': float(nwm_kge), 'geo_kge': geo_kge, 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
         
     finally:
         session.close()
@@ -261,8 +283,7 @@ def compute_one_kge(session, network, raw_id, usgs_df):
         kge = kge_rating(df_shared['values'].to_numpy(), usgs_df_shared['values'].to_numpy())
         kge_length = len(df_shared['values'])
         if math.isnan(kge):
-            print(f"{network} Error: No {network} KGE rating, check for constant series")
-            return {f"{network} Error": f"No KGE {network} rating, check for constant series"}
+            return {"kge": None, "length": kge_length}
     except Exception as e:
         print (f"{network} Error: " + repr(e))
         return {f"{network} Error": f"Unknown {network} Error"}

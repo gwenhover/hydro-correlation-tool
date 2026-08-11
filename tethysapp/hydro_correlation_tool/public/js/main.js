@@ -404,33 +404,47 @@ $(function() {
                 document.getElementById('nwm-id-input').value = "";
                 document.getElementById('geo-id-input').value = "";
                 $("#save-and-verify").prop("disabled", false);
-            }
-            else{
-                nwm_kge = data.nwm_kge;
-                geo_kge = data.geo_kge;
+                return
+            } else{
+                nwm_kge = data.nwm_kge
                 nwm_kge_length = data.nwm_kge_length;
+                geo_kge = data.geo_kge
                 geo_kge_length = data.geo_kge_length;
-                nwm_color = null;
-                geo_color = null;
-                if (nwm_kge >= .3){
-                    nwm_color = 'green';
-                } else if (-.41 <= nwm_kge){
-                    nwm_color = 'darkgoldenrod';
-                } else{
-                    nwm_color = 'red';
+                if (nwm_kge === null){
+                    nwm_color = 'red'
                 }
-                if (geo_kge >= .3){
-                    geo_color = 'green';
-                } else if (-.41 <= geo_kge){
-                    geo_color = 'darkgoldenrod';
-                } else{
-                    geo_color = 'red';
+                else{
+                    nwm_color = null;
+                    if (nwm_kge >= .3){
+                        nwm_color = 'green';
+                    } else if (-.41 <= nwm_kge){
+                        nwm_color = 'darkgoldenrod';
+                    } else{
+                        nwm_color = 'red';
+                    }
+                    nwm_kge = nwm_kge.toFixed(2)
                 }
-                $("#save-and-verify").prop("disabled", false);
-                $("#save-confirm-footer").prop("disabled", false);
-                $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge.toFixed(2)).css("color", geo_color);
-                $("#nwm-kge").text("     NWM KGE: " + nwm_kge.toFixed(2)).css("color", nwm_color);
+                if (data.geo_kge === null){
+                    geo_kge = data.geo_kge
+                    geo_color = 'red'
+                }
+                else{
+                    geo_color = null;
+                    if (geo_kge >= .3){
+                        geo_color = 'green';
+                    } else if (-.41 <= geo_kge){
+                        geo_color = 'darkgoldenrod';
+                    } else{
+                        geo_color = 'red';
+                    }
+                    geo_kge = geo_kge.toFixed(2)
+                }
             }
+            $("#save-and-verify").prop("disabled", false);
+            $("#save-confirm-footer").prop("disabled", false);
+            $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge).css("color", geo_color);
+            $("#nwm-kge").text("     NWM KGE: " + nwm_kge).css("color", nwm_color);
+            
         }).fail(function(){
             if (modalEl.classList.contains('show')) {
                 bootstrap.Modal.getOrCreateInstance(modalEl).hide();
@@ -827,7 +841,12 @@ $(function() {
             if ("NWM Error" in data){
                 nwm_kge = data['NWM Error']
                 nwm_color = 'red'
-            } else{
+            } 
+            else if (data.nwm_kge === null){
+                nwm_kge = data.nwm_kge
+                nwm_color = 'red'
+            }
+            else{
                 nwm_kge = data.nwm_kge
                 if (nwm_kge >= .3){
                     nwm_color = 'green';
@@ -841,7 +860,12 @@ $(function() {
             if ("GEOGLOWS Error" in data){
                 geo_kge = data['GEOGLOWS Error']
                 geo_color = 'red'
-            } else{
+            } 
+            else if (data.geo_kge === null){
+                geo_kge = data.geo_kge
+                geo_color = 'red'
+            }
+            else{
                 geo_kge = data.geo_kge
                 if (geo_kge >= .3){
                     geo_color = 'green';
