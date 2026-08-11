@@ -410,6 +410,12 @@ $(function() {
                 nwm_kge_length = data.nwm_kge_length;
                 geo_kge = data.geo_kge
                 geo_kge_length = data.geo_kge_length;
+                // nwm_kge/geo_kge must stay numeric — they are exactly what
+                // #save-confirm-footer POSTs to SAVE_URL. Rounding is for the
+                // modal only, so it lands in its own variable; toFixed also
+                // returns a string, and throws on a null KGE.
+                var nwm_kge_text = nwm_kge;
+                var geo_kge_text = geo_kge;
                 if (nwm_kge === null){
                     nwm_color = 'red'
                 }
@@ -422,10 +428,9 @@ $(function() {
                     } else{
                         nwm_color = 'red';
                     }
-                    nwm_kge = nwm_kge.toFixed(2)
+                    nwm_kge_text = nwm_kge.toFixed(2)
                 }
-                if (data.geo_kge === null){
-                    geo_kge = data.geo_kge
+                if (geo_kge === null){
                     geo_color = 'red'
                 }
                 else{
@@ -437,13 +442,13 @@ $(function() {
                     } else{
                         geo_color = 'red';
                     }
-                    geo_kge = geo_kge.toFixed(2)
+                    geo_kge_text = geo_kge.toFixed(2)
                 }
             }
             $("#save-and-verify").prop("disabled", false);
             $("#save-confirm-footer").prop("disabled", false);
-            $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge).css("color", geo_color);
-            $("#nwm-kge").text("     NWM KGE: " + nwm_kge).css("color", nwm_color);
+            $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge_text).css("color", geo_color);
+            $("#nwm-kge").text("     NWM KGE: " + nwm_kge_text).css("color", nwm_color);
             
         }).fail(function(){
             if (modalEl.classList.contains('show')) {
@@ -838,46 +843,53 @@ $(function() {
                 $('#panel-kge-rating').empty()
                 return
             }
+            // Panel display only. These deliberately do NOT write to the outer
+            // nwm_kge/geo_kge/nwm_color/geo_color: those hold the numeric values
+            // #save-confirm-footer POSTs to SAVE_URL, and this panel refresh is
+            // async — it can land while a save modal is open and would otherwise
+            // overwrite the save payload with a rounded string, or with an error
+            // message like "Missing data, check NWM ID".
+            var nwm_text, nwm_col, geo_text, geo_col;
             if ("NWM Error" in data){
-                nwm_kge = data['NWM Error']
-                nwm_color = 'red'
-            } 
+                nwm_text = data['NWM Error']
+                nwm_col = 'red'
+            }
             else if (data.nwm_kge === null){
-                nwm_kge = data.nwm_kge
-                nwm_color = 'red'
+                nwm_text = data.nwm_kge
+                nwm_col = 'red'
             }
             else{
-                nwm_kge = data.nwm_kge
-                if (nwm_kge >= .3){
-                    nwm_color = 'green';
-                } else if (-.41 <= nwm_kge){
-                    nwm_color = 'darkgoldenrod';
+                nwm_text = data.nwm_kge
+                if (nwm_text >= .3){
+                    nwm_col = 'green';
+                } else if (-.41 <= nwm_text){
+                    nwm_col = 'darkgoldenrod';
                 } else{
-                    nwm_color = 'red';
+                    nwm_col = 'red';
                 }
-                nwm_kge = nwm_kge.toFixed(2)
+                nwm_text = nwm_text.toFixed(2)
             }
             if ("GEOGLOWS Error" in data){
-                geo_kge = data['GEOGLOWS Error']
-                geo_color = 'red'
-            } 
+                geo_text = data['GEOGLOWS Error']
+                geo_col = 'red'
+            }
             else if (data.geo_kge === null){
-                geo_kge = data.geo_kge
-                geo_color = 'red'
+                geo_text = data.geo_kge
+                geo_col = 'red'
             }
             else{
-                geo_kge = data.geo_kge
-                if (geo_kge >= .3){
-                    geo_color = 'green';
-                } else if (-.41 <= geo_kge){
-                    geo_color = 'darkgoldenrod';
+                geo_text = data.geo_kge
+                if (geo_text >= .3){
+                    geo_col = 'green';
+                } else if (-.41 <= geo_text){
+                    geo_col = 'darkgoldenrod';
                 } else{
-                    geo_color = 'red';
+                    geo_col = 'red';
                 }
-                geo_kge = geo_kge.toFixed(2)
+                geo_text = geo_text.toFixed(2)
             }
             $('#panel-kge-rating').html(
-                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_color + '; border: 2px solid ' + nwm_color + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_kge + '</span>' + '<span style="color: ' + geo_color + '; border: 2px solid '+ geo_color +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_kge + '</span>' + '</h4>'
+                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_col + '; border: 2px solid ' + nwm_col + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_text + '</span>' + '<span style="color: ' + geo_col + '; border: 2px solid '+ geo_col +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_text + '</span>' + '</h4>'
             )
 
         }).fail(function(){

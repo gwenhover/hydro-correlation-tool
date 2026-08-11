@@ -12,7 +12,8 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
         data, meta = waterdata.get_daily(
             monitoring_location_id=usgs_id,
             parameter_code="00060",
-            time=(start,end)
+            time=(start,end),
+            statistic_id="00003"
         )
     except KeyError:
         print("No data")
@@ -28,7 +29,6 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
         print("No data")
         return {"dates": [], "values": [], "units": None}
     
-    data = data.drop_duplicates(subset="time", keep="first")
     return {
         "dates": data["time"].dt.strftime("%Y-%m-%d").tolist(),
         "values": (data["value"] * 0.0283168).tolist(),
