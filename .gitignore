@@ -16,3 +16,4 @@ preprocessing/gage_vpu.csv
 
 # API token — never commit
 preprocessing/nwm_token.txt
+preprocessing/usgs_token.txt
