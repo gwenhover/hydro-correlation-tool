@@ -177,16 +177,15 @@
       </div>
     </div>
   </div>
-  <div class="modal fade" id="verified-modal" tabindex="-1" aria-labelledby="verified-modal-label" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title w-100 text-center" id="verified-modal-label">Saved and verified!</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p>You may move on to the next gage.</p>
-        </div>
+  <div class="toast-container position-fixed p-3" id="toast-cont">
+    <div class="toast" id="verified-toast" role="status" aria-live="polite" aria-atomic="true" data-bs-delay="6000">
+      <div class="toast-header">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <strong class="me-auto" id="verified-toast-label">Saved and verified!</strong>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        You may move on to the next gage.
       </div>
     </div>
   </div>

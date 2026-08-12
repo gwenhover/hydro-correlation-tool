@@ -481,9 +481,25 @@ $(function() {
                 document.getElementById('geo-id-input').value = "";
             }
             else{
-                const modalEl = document.getElementById("verified-modal");
-                bootstrap.Modal.getOrCreateInstance(modalEl).show();
                 usgsFeature.set('verification_status', data.status)
+                var min_distance = Infinity
+                var next_gage = usgsFeature
+                var prospect_coords = null
+                var current_coords = usgsFeature.getGeometry().getCoordinates()
+                var prospect_distance = null
+                for (const gage of gage_source.getFeatures()){
+                    if (gage.get("verification_status") === "Unverified"){
+                        prospect_coords = gage.getGeometry().getCoordinates()
+                        prospect_distance = Math.hypot((current_coords[0] - prospect_coords[0]), (current_coords[1] - prospect_coords[1]))
+                        if (prospect_distance < min_distance){
+                            min_distance = prospect_distance
+                            next_gage = gage
+                        }
+                    }
+                }
+                snap_gage(next_gage)
+                const toastEl = document.getElementById("verified-toast");
+                bootstrap.Toast.getOrCreateInstance(toastEl).show();
                 document.getElementById('nwm-id-input').value = "";
                 document.getElementById('geo-id-input').value = "";
                 $('#log-geo').removeClass('armed');

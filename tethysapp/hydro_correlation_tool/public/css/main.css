@@ -213,3 +213,31 @@
     color: #fff;
     border-color: #146c43;
 }
+
+#toast-cont{
+    top: 64px;
+    left: 96px;
+}
+
+#verified-toast{
+    min-width: 340px;
+    background-color: #fff;
+    border: 1px solid #146c43;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+#verified-toast .toast-header{
+    background-color: #198754;
+    border-bottom-color: #146c43;
+    color: #fff;
+}
+
+#verified-toast-label{
+    font-size: 17px;
+    font-weight: bold;
+}
+
+#verified-toast .toast-body{
+    font-size: 15px;
+    color: #1a1a1a;
+}
