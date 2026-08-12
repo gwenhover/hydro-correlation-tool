@@ -564,7 +564,9 @@ $(function() {
             // Stop early once we have one of each.
             return gage !== null && reach !== null;
         }, { hitTolerance: 5 });   // 1px stream lines are hard to hit exactly
-        
+        if (gage){
+            snap_gage(gage)
+        }
         if (gage !== null && gage.get('usgs_id') !== selectedUsgsId) {
             feature_count = 1;
             new_gage = true;
@@ -713,7 +715,14 @@ $(function() {
         };
     });
 
-
+    function snap_gage(gage_feature){
+        var gage_coords = gage_feature.getGeometry().getCoordinates()
+        ol_map.getView().animate({
+            center: gage_coords,
+            zoom: 16,
+            duration: 300
+        })
+    }
     function commit_reach(river_id, network){
         if (network === 'GEOGLOWS'){
             selectedGeoglowsId = river_id;
