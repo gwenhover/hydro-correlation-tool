@@ -140,16 +140,16 @@ $(function() {
         url: 'https://{a-d}.tiles.mapbox.com/v4/byu-hydroinformatics.geoglows-us/{z}/{x}/{y}.vector.pbf?access_token=' + MAPBOX_TOKEN
     });
     var nwm_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#3388ff', width: 1 })
+        stroke: new ol.style.Stroke({color: '#1054b3', width: 3 })
     });
     var base_highlight_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#f82aa9', width: 3})
+        stroke: new ol.style.Stroke({color: '#f82aa9', width: 6})
     });
     var geo_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#020447', width: 1 })
+        stroke: new ol.style.Stroke({color: '#020447', width: 3 })
     });
     var selected_highlight_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#cfec11', width: 3})
+        stroke: new ol.style.Stroke({color: '#cfec11', width: 6})
     });
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
