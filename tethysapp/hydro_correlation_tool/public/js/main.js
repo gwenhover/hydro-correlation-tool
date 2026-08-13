@@ -98,7 +98,7 @@ $(function() {
         var key = (radius + '|' + gage_status + '|' + unreachable);
         
         if (!gageStyleCache[key]) {
-            if (unreachable){
+            if (unreachable && gage_status === 'Unverified'){
                 gageStyleCache[key] = new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: radius,
@@ -106,7 +106,16 @@ $(function() {
                         stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
                     })
                 });
-            } else{
+            } else if (unreachable) {
+                gageStyleCache[key] = new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: radius,
+                        fill: new ol.style.Fill({ color: '#5a5f66' }),
+                        stroke: new ol.style.Stroke({ color: statusColor, width: 3 })
+                    })
+                });
+            }
+            else{
                 gageStyleCache[key] = new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: radius,
@@ -564,12 +573,25 @@ $(function() {
     // callback from an older group is stale and must not touch it, or the counter
     // drifts and never lands on zero (spinner hangs forever).
     var feature_count = 0;
+    var is_unreachable = false;
+    // Written from two places (the gage callback and the wait-group completion),
+    // so it lives in one constant — two copies would drift the moment the
+    // wording changes.
+    var UNREACHABLE_NOTE =
+        '<div style="border-left: 4px solid #5a5f66; background: #f5f6f7; padding: 12px 16px; margin-top: 20px; border-radius: 4px;">' +
+            '<div style="font-weight: 600; color: #33383f; margin-bottom: 4px;">No observed discharge</div>' +
+            '<div style="color: #5a5f66; font-size: 0.9rem; line-height: 1.45;">This gage has no USGS record overlapping 2018&ndash;2022. Verify by spatial reference &mdash; compare the NWM and GEOGLOWS reaches for location and flow magnitude.</div>' +
+        '</div>';
     function feature_done(cur_msg) {
         if (cur_msg !== msg_generation) {
             return;
         }
         feature_count -= 1;
-        if (feature_count === 0) {
+        if (is_unreachable && feature_count === 0){
+            $('#hydrograph-msg').html(UNREACHABLE_NOTE);
+            display_kge(selectedNwmId, selectedGeoglowsId, selectedUsgsId)
+        }
+        else if (feature_count === 0) {
             if (!msg_has_note){
                 $('#hydrograph-msg').empty();
             }
@@ -612,6 +634,7 @@ $(function() {
             usgsFeature = null;
             baseNwmId = null;
             baseGeoglowsId = null;
+            is_unreachable = false;
             nwm_layer.changed();
             geoglows_layer.changed();
             map_mode = null;
@@ -625,12 +648,18 @@ $(function() {
         }
 
         if (reach !== null) {
+
             if (gage === null || gage.get('usgs_id') === selectedUsgsId){
                 // Starting a new wait group: this branch fires exactly one
                 // load_reach, so the count is 1 outright, not an increment.
                 feature_count = 1;
                 msg_generation += 1;
-                msg_has_note = false;
+                if (is_unreachable){
+                    msg_has_note = true;
+                }
+                else{
+                    msg_has_note = false;
+                }
                 $('#hydrograph-msg').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading data, please wait.</p>');
                 $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>');
             }
@@ -645,6 +674,12 @@ $(function() {
     });
 
     function select_gage(gage_feature, recenter_only){
+        if (gage_feature.get('unreachable') === true){
+            is_unreachable = true
+        }
+        else{
+            is_unreachable = false
+        }
         var gage_coords = gage_feature.getGeometry().getCoordinates()
         ol_map.getView().animate({
             center: gage_coords,
@@ -717,12 +752,12 @@ $(function() {
             if (data.dates.length === 0) {
                 if (cur_msg === msg_generation) {
                     msg_has_note = true;
-                    $('#hydrograph-msg').html('<p class="text-muted">No observed discharge data for this gage.</p>');
+                    $('#hydrograph-msg').html(UNREACHABLE_NOTE);
                 }
                 feature_done(cur_msg);
                 return;
             }
-
+            
             series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
 
             feature_done(cur_msg);
@@ -889,47 +924,60 @@ $(function() {
             // async — it can land while a save modal is open and would otherwise
             // overwrite the save payload with a rounded string, or with an error
             // message like "Missing data, check NWM ID".
-            var nwm_text, nwm_col, geo_text, geo_col;
-            if ("NWM Error" in data){
-                nwm_text = data['NWM Error']
-                nwm_col = 'red'
-            }
-            else if (data.nwm_kge === null){
-                nwm_text = data.nwm_kge
-                nwm_col = 'red'
-            }
-            else{
-                nwm_text = data.nwm_kge
-                if (nwm_text >= .3){
-                    nwm_col = 'green';
-                } else if (-.41 <= nwm_text){
-                    nwm_col = 'darkgoldenrod';
-                } else{
-                    nwm_col = 'red';
+            var nwm_text, nwm_col, geo_text, geo_col, nwm_border, geo_border;
+            if ("unreachable" in data){
+                nwm_text = 'N/A'
+                geo_text = 'N/A'
+                nwm_col = '#5a5f66'
+                geo_col = '#5a5f66'
+                nwm_border = 'dashed'
+                geo_border = 'dashed'
+            } else {
+                if ("NWM Error" in data){
+                    nwm_text = data['NWM Error']
+                    nwm_col = 'red'
                 }
-                nwm_text = nwm_text.toFixed(2)
-            }
-            if ("GEOGLOWS Error" in data){
-                geo_text = data['GEOGLOWS Error']
-                geo_col = 'red'
-            }
-            else if (data.geo_kge === null){
-                geo_text = data.geo_kge
-                geo_col = 'red'
-            }
-            else{
-                geo_text = data.geo_kge
-                if (geo_text >= .3){
-                    geo_col = 'green';
-                } else if (-.41 <= geo_text){
-                    geo_col = 'darkgoldenrod';
-                } else{
-                    geo_col = 'red';
+                else if (data.nwm_kge === null){
+                    nwm_text = 'N/A'
+                    nwm_col = '#5a5f66'
+                    nwm_border = 'dashed'
                 }
-                geo_text = geo_text.toFixed(2)
+                else{
+                    nwm_border = 'solid'
+                    nwm_text = data.nwm_kge
+                    if (nwm_text >= .3){
+                        nwm_col = 'green';
+                    } else if (-.41 <= nwm_text){
+                        nwm_col = 'darkgoldenrod';
+                    } else{
+                        nwm_col = 'red';
+                    }
+                    nwm_text = nwm_text.toFixed(2)
+                }
+                if ("GEOGLOWS Error" in data){
+                    geo_text = data['GEOGLOWS Error']
+                    geo_col = 'red'
+                }
+                else if (data.geo_kge === null){
+                    geo_text = 'N/A'
+                    geo_col = '#5a5f66'
+                    geo_border = 'dashed'
+                }
+                else{
+                    geo_text = data.geo_kge
+                    geo_border = 'solid'
+                    if (geo_text >= .3){
+                        geo_col = 'green';
+                    } else if (-.41 <= geo_text){
+                        geo_col = 'darkgoldenrod';
+                    } else{
+                        geo_col = 'red';
+                    }
+                    geo_text = geo_text.toFixed(2)
+                }
             }
             $('#panel-kge-rating').html(
-                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_col + '; border: 2px solid ' + nwm_col + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_text + '</span>' + '<span style="color: ' + geo_col + '; border: 2px solid '+ geo_col +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_text + '</span>' + '</h4>'
+                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_col + '; border: 2px '+ nwm_border + ' ' + nwm_col + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_text + '</span>' + '<span style="color: ' + geo_col + '; border: 2px '+ geo_border + ' ' + geo_col +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_text + '</span>' + '</h4>'
             )
 
         }).fail(function(){

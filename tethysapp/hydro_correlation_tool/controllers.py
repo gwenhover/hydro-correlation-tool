@@ -164,8 +164,16 @@ def save_and_verify(request):
             geo_kge = float(geo_kge)
         else:
             geo_kge = None
-        nwm_kge_length = int((request.POST.get('nwm_kge_length')))
-        geo_kge_length = int((request.POST.get('geo_kge_length')))
+        nwm_kge_length = (request.POST.get('nwm_kge_length'))
+        geo_kge_length = (request.POST.get('geo_kge_length'))
+        if nwm_kge_length:
+            nwm_kge_length = int(nwm_kge_length)
+        else: 
+            nwm_kge_length = None
+        if geo_kge_length:
+            geo_kge_length = int(geo_kge_length)
+        else:
+            geo_kge_length = None
         new_row = session.get(hctTable, f"USGS-{usgs_final}")
         if new_row is None:
             print("ERROR: Could not save or validate")
@@ -212,9 +220,10 @@ def compute_kge(request):
     try:
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
-        if usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
+        if usgs_row is None:
             return JsonResponse({"Error": "Missing data, check selected IDs"})
-
+        if len(usgs_row.reach_data["dates"]) == 0:
+            return JsonResponse({'nwm_kge': None, 'geo_kge': None, 'nwm_kge_length': None, 'geo_kge_length': None, 'unreachable': True})
         usgs_df = load_series(usgs_row)
         
         nwm = compute_one_kge(session, 'NWM', request.POST.get('nwm_id'), usgs_df)
