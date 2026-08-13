@@ -15,10 +15,6 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
             time=(start,end),
             statistic_id="00003"
         )
-    except KeyError:
-        print("No data")
-        return {"dates": [], "values": [], "units": None}
-    
     except Exception as e:
         # network error, bad id, api down, etc. Log it so failures aren't silent,
         # but still return an empty result so the front end shows an empty state.
