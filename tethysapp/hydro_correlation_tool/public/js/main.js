@@ -44,6 +44,7 @@ $(function() {
     var gageLastResolution = null;  // every feature in one frame shares a resolution...
     var gageLastStyle = null;   
     var gageLastStatus = null;    // ...so memoize to skip recomputing ~9,000x per frame
+    var gageLastViability = null;
     var headwaters = false;
     var statusColors = {'Verified': '#1fb449', 'Edited': '#e4c134', 'Unverified': '#b12424'}
     var selectedNwmId = null;
@@ -83,8 +84,9 @@ $(function() {
     function gageStyle(feature, resolution) {
         // Fast path: same frame (same resolution) -> reuse the computed style.
         var gage_status = feature.get('verification_status');
+        var unreachable = feature.get('unreachable');
         var statusColor = statusColors[gage_status] || statusColors['Unverified'];
-        if (resolution === gageLastResolution && gage_status === gageLastStatus) {
+        if (resolution === gageLastResolution && gage_status === gageLastStatus && unreachable === gageLastViability) {
             return gageLastStyle;
         }
         var zoom = ol_map.getView().getZoomForResolution(resolution);
@@ -93,20 +95,31 @@ $(function() {
         // 0.5 so only a handful of distinct Style objects are ever created.
         var t = Math.max(0, Math.min(1, (zoom - 4) / (11 - 4)));
         var radius = Math.round((3 + t * 3) * 2) / 2;
-        var key = (radius + '|' + gage_status);
-
+        var key = (radius + '|' + gage_status + '|' + unreachable);
+        
         if (!gageStyleCache[key]) {
-            gageStyleCache[key] = new ol.style.Style({
-                image: new ol.style.Circle({
-                    radius: radius,
-                    fill: new ol.style.Fill({ color: statusColor }),
-                    stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
-                })
-            });
+            if (unreachable){
+                gageStyleCache[key] = new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: radius,
+                        fill: new ol.style.Fill({ color: '#5a5f66' }),
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
+                    })
+                });
+            } else{
+                gageStyleCache[key] = new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: radius,
+                        fill: new ol.style.Fill({ color: statusColor }),
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
+                    })
+                });
+            }
         }
         gageLastStatus = gage_status;
         gageLastResolution = resolution;
         gageLastStyle = gageStyleCache[key];
+        gageLastViability = unreachable;
         return gageLastStyle;
     }
 

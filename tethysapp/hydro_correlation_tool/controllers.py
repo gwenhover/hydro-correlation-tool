@@ -12,6 +12,7 @@ import hydroeval as he
 from django.utils import timezone
 from datetime import datetime
 import math
+import os
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -119,6 +120,9 @@ def get_reach_info(request):
     finally:
         session.close()
 
+UNREACHABLE_CSV = os.path.join(os.path.dirname(__file__), 'public', 'data', 'unreachable_gages.csv')
+UNREACHABLE_GAGES = (pd.read_csv(UNREACHABLE_CSV)['gages'].astype(str).to_list())
+
 @controller(
     name='db_get_gage',
     url='db_gage',
@@ -131,7 +135,9 @@ def db_get_gage(request):
     # instead so pandas' legacy DBAPI2 path (which read_postgis also uses) works.
     raw_conn = Engine.raw_connection()
     try:
-        gdf_json = gpd.read_postgis(sql, raw_conn, 'geom').to_json()
+        gdf = gpd.read_postgis(sql, raw_conn, 'geom')
+        gdf['unreachable'] = gdf['usgs_id'].isin(UNREACHABLE_GAGES)
+        gdf_json = gdf.to_json()
     finally:
         raw_conn.close()
     return (HttpResponse(gdf_json, content_type="application/json"))
