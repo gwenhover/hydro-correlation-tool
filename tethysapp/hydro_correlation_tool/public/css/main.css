@@ -1,5 +1,5 @@
 .map-row {
-    height: 85vh;
+    height: calc(100vh - 130px);
 }
 
 /* The panel is a vertical flex column filling the row's height, split into a
@@ -8,6 +8,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    zoom: 0.75;
 }
 
 /* flex: 0 0 auto = take natural height, never grow or shrink → stays pinned. */
@@ -240,4 +241,8 @@
 #verified-toast .toast-body{
     font-size: 15px;
     color: #1a1a1a;
+}
+
+#hydrograph-1 {
+    height: 40vh;
 }

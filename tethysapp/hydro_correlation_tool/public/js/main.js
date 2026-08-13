@@ -1013,7 +1013,10 @@ $(function() {
             var layout = {
                 title: traces.map(function(t) { return t.name; }).join(' vs '),
                 xaxis: { title: 'Date' },
-                yaxis: { title: 'Discharge (' + current_unit + ')' }
+                yaxis: { title: 'Discharge (' + current_unit + ')' },
+                margin: {t: 40, b: 45, l: 55, r: 20},
+                height: Math.round(window.innerHeight * (is_unreachable ? 0.46 : 0.58))
+
             };
             Plotly.react('hydro-modal', traces, layout);
             return;
@@ -1028,10 +1031,13 @@ $(function() {
                 // "GEOGLOWS", a full comparison says "USGS Observed vs GEOGLOWS".
                 title: traces.map(function(t) { return t.name; }).join(' vs '),
                 xaxis: { title: 'Date' },
-                yaxis: { title: 'Discharge (' + current_unit + ')' }
+                yaxis: { title: 'Discharge (' + current_unit + ')' },
+                margin: {t: 40, b: 45, l: 55, r: 20},
+                height: Math.round(window.innerHeight * (is_unreachable ? 0.46 : 0.58))
+
             };
 
-            Plotly.react('hydrograph-1', traces, layout);
+            Plotly.react('hydrograph-1', traces, layout, {responsive: true});
             used_count = 1;                 // single mode draws into the first div only
             
         } else {

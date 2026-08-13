@@ -279,8 +279,7 @@ def compute_one_kge(session, network, raw_id, usgs_df):
     try:
         try:
             if not raw_id:
-                print(f"{network} Error: No rating")
-                return {f"{network} Error": "No rating"}
+                return {"kge": None, "length": None}
             id = int(raw_id)
         except:
             print(f"{network} Error: Invalid {network} ID or session connect error")
