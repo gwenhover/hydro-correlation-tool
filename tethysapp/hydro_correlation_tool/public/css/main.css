@@ -164,6 +164,32 @@
         #c00 56%, transparent 56%);
 }
 
+.chart-legend-container {
+    bottom: 0.5em;
+    left: 0.5em;
+}
+
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 50%;
+    border: 1px solid #fff;
+}
+
+.legend-line {
+    display: inline-block;
+    width: 1.3em;
+    height: 0.5em;
+    border: 1px solid #fff;
+}
+
 .btn-light-blue {
   background-color: #b8dffd;
   color: #073f94;

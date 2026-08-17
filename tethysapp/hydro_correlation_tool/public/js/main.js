@@ -47,6 +47,7 @@ $(function() {
     var gageLastViability = null;
     var headwaters = false;
     var statusColors = {'Verified': '#1fb449', 'Edited': '#e4c134', 'Unverified': '#b12424'}
+    var unreachable_color = '#5a5f66'
     var selectedNwmId = null;
     var baseNwmId = null;
     var selectedGeoglowsId = null;
@@ -55,12 +56,66 @@ $(function() {
     var usgsFeature = null;
     var map_mode = null;
     var hw_button = document.createElement('button');
+    var map_legend = document.createElement('div');
+    var seeded_reach_color = '#f82aa9'
+    var selected_reach_color = '#cfec11'
+
+    for (var stat in statusColors){
+        var row = document.createElement('div');
+        row.className = 'legend-row';
+        var swatch = document.createElement('span');
+        swatch.className = 'legend-swatch';
+        swatch.style.background = statusColors[stat];
+        var label = document.createElement('span');
+        label.textContent = stat;
+        row.appendChild(swatch);
+        row.appendChild(label);
+        map_legend.appendChild(row);
+    }
+    var unreachable_row = document.createElement('div');
+    unreachable_row.className = 'legend-row';
+    var unreachable_label = document.createElement('span');
+    var unreachable_swatch = document.createElement('span');
+    unreachable_swatch.className = 'legend-swatch';
+    unreachable_swatch.style.background = unreachable_color;
+    unreachable_label.textContent = 'No Data (ringed if edited or verified)';
+    unreachable_row.appendChild(unreachable_swatch);
+    unreachable_row.appendChild(unreachable_label);
+    map_legend.appendChild(unreachable_row);
+
+    var seeded_row = document.createElement('div');
+    seeded_row.className = 'legend-row';
+    var seeded_label = document.createElement('span');
+    var seeded_line = document.createElement('span');
+    seeded_line.className = 'legend-line';
+    seeded_line.style.background = seeded_reach_color;
+    seeded_label.textContent = 'Seeded Reach';
+    seeded_row.appendChild(seeded_line);
+    seeded_row.appendChild(seeded_label);
+    map_legend.appendChild(seeded_row);
+
+    var selected_row = document.createElement('div');
+    selected_row.className = 'legend-row';
+    var selected_label = document.createElement('span');
+    var selected_line = document.createElement('span');
+    selected_line.className = 'legend-line';
+    selected_line.style.background = selected_reach_color;
+    selected_label.textContent = 'Selected Reach';
+    selected_row.appendChild(selected_line);
+    selected_row.appendChild(selected_label);
+    map_legend.appendChild(selected_row);
+
+
     hw_button.innerHTML = 'H';
     hw_button.title = 'Show headwater streams';
     
     var hw_element = document.createElement('div');
     hw_element.className = 'headwater-toggle ol-unselectable ol-control';
     hw_element.appendChild(hw_button);
+
+    var map_legend_element = document.createElement('div');
+    map_legend_element.className = 'chart-legend-container ol-unselectable ol-control';
+    map_legend_element.appendChild(map_legend);
 
     hw_button.classList.add('active');
     hw_button.addEventListener('click', function() {
@@ -78,7 +133,7 @@ $(function() {
         geoglows_layer.changed();
     });
     ol_map.addControl(new ol.control.Control({ element: hw_element }));
-
+    ol_map.addControl(new ol.control.Control({ element: map_legend_element }));
 
 
     function gageStyle(feature, resolution) {
@@ -102,7 +157,7 @@ $(function() {
                 gageStyleCache[key] = new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: radius,
-                        fill: new ol.style.Fill({ color: '#5a5f66' }),
+                        fill: new ol.style.Fill({ color: unreachable_color }),
                         stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 })
                     })
                 });
@@ -110,7 +165,7 @@ $(function() {
                 gageStyleCache[key] = new ol.style.Style({
                     image: new ol.style.Circle({
                         radius: radius,
-                        fill: new ol.style.Fill({ color: '#5a5f66' }),
+                        fill: new ol.style.Fill({ color: unreachable_color }),
                         stroke: new ol.style.Stroke({ color: statusColor, width: 3 })
                     })
                 });
@@ -165,13 +220,13 @@ $(function() {
         stroke: new ol.style.Stroke({color: '#1054b3', width: 3 })
     });
     var base_highlight_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#f82aa9', width: 6})
+        stroke: new ol.style.Stroke({color: seeded_reach_color, width: 6})
     });
     var geo_style = new ol.style.Style({
         stroke: new ol.style.Stroke({color: '#020447', width: 3 })
     });
     var selected_highlight_style = new ol.style.Style({
-        stroke: new ol.style.Stroke({color: '#cfec11', width: 6})
+        stroke: new ol.style.Stroke({color: selected_reach_color, width: 6})
     });
     var nwm_layer = new ol.layer.VectorTile({
         source: nwm_source,
