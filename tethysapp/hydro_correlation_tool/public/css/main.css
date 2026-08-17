@@ -175,6 +175,32 @@
     gap: 0.4em;
 }
 
+.legend-row.off {
+    opacity: .4;
+}
+
+.legend-row.clickable {
+    cursor: pointer;
+}
+
+.legend-title {
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.65;
+    margin-bottom: 0.4em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+}
+
+
+.legend-row.clickable:hover {
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px; 
+}
+
+
 .legend-swatch {
     display: inline-block;
     width: 0.7em;

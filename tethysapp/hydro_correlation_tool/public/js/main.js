@@ -59,10 +59,18 @@ $(function() {
     var map_legend = document.createElement('div');
     var seeded_reach_color = '#f82aa9'
     var selected_reach_color = '#cfec11'
+    var shown_statuses = ["Verified", "Edited", "Unverified"]
 
-    for (var stat in statusColors){
-        var row = document.createElement('div');
-        row.className = 'legend-row';
+    var text_row = document.createElement('div');
+    text_row.id = 'text-row';
+    text_row.className = 'legend-title';
+    text_row.textContent = 'Click Verification Status to Filter'
+    map_legend.appendChild(text_row);
+
+    for (let stat in statusColors){
+        let row = document.createElement('div');
+        row.className = 'legend-row clickable';
+        row.title = 'Hide ' + stat.toLowerCase() + ' gages';
         var swatch = document.createElement('span');
         swatch.className = 'legend-swatch';
         swatch.style.background = statusColors[stat];
@@ -71,6 +79,20 @@ $(function() {
         row.appendChild(swatch);
         row.appendChild(label);
         map_legend.appendChild(row);
+
+        row.addEventListener('click', function() {
+
+            row.classList.toggle('off');
+            if (shown_statuses.includes(stat)){
+                shown_statuses = shown_statuses.filter(status => status !== stat);
+                row.title = 'Show ' + stat.toLowerCase() + ' gages';
+            }
+            else{
+                shown_statuses.push(stat);
+                row.title = 'Hide ' + stat.toLowerCase() + ' gages';
+            }
+            gage_layer.changed();
+        });
     }
     var unreachable_row = document.createElement('div');
     unreachable_row.className = 'legend-row';
@@ -137,6 +159,9 @@ $(function() {
 
 
     function gageStyle(feature, resolution) {
+        
+        if (!shown_statuses.includes(feature.get('verification_status'))) return;
+
         // Fast path: same frame (same resolution) -> reuse the computed style.
         var gage_status = feature.get('verification_status');
         var unreachable = feature.get('unreachable');
@@ -565,7 +590,7 @@ $(function() {
                 var current_coords = usgsFeature.getGeometry().getCoordinates()
                 var prospect_distance = null
                 for (const gage of gage_source.getFeatures()){
-                    if (gage.get("verification_status") === "Unverified"){
+                    if (gage.get("verification_status") === "Unverified" && shown_statuses.includes("Unverified")){
                         prospect_coords = gage.getGeometry().getCoordinates()
                         prospect_distance = Math.hypot((current_coords[0] - prospect_coords[0]), (current_coords[1] - prospect_coords[1]))
                         if (prospect_distance < min_distance){
