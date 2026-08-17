@@ -49,8 +49,10 @@ $(function() {
     var statusColors = {'Verified': '#1fb449', 'Edited': '#e4c134', 'Unverified': '#b12424'}
     var unreachable_color = '#5a5f66'
     var selectedNwmId = null;
+    var seededNwmId = null;
     var baseNwmId = null;
     var selectedGeoglowsId = null;
+    var seededGeoglowsId = null;
     var baseGeoglowsId = null;
     var selectedUsgsId = null;
     var usgsFeature = null;
@@ -258,7 +260,7 @@ $(function() {
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
         style: function(feature){
-            if (baseNwmId != null && String(feature.get('station_id')) === String(baseNwmId)){
+            if (seededNwmId != null && String(feature.get('station_id')) === String(seededNwmId)){
                 return (base_highlight_style)
             }
             else if (selectedNwmId != null && String(feature.get('station_id')) === String(selectedNwmId)){
@@ -283,7 +285,7 @@ $(function() {
         zIndex: 5,   // below gages (10), above basemap
         minZoom: 9,
         style: function(feature){
-            if (baseGeoglowsId != null && String(feature.get('station_id')) === String(baseGeoglowsId)){
+            if (seededGeoglowsId != null && String(feature.get('station_id')) === String(seededGeoglowsId)){
                 return (base_highlight_style)
             }
             else if (selectedGeoglowsId != null && String(feature.get('station_id')) === String(selectedGeoglowsId)){
@@ -584,6 +586,8 @@ $(function() {
             }
             else{
                 usgsFeature.set('verification_status', data.status)
+                usgsFeature.set('nwm_feature_id', staged_nwm)
+                usgsFeature.set('geoglows_river_id', staged_geoglows)
                 var min_distance = Infinity
                 var next_gage = usgsFeature
                 var prospect_coords = null
@@ -712,7 +716,9 @@ $(function() {
             selectedNwmId = null;
             selectedUsgsId = null;
             usgsFeature = null;
+            seededNwmId = null;
             baseNwmId = null;
+            seededGeoglowsId = null;
             baseGeoglowsId = null;
             is_unreachable = false;
             nwm_layer.changed();
@@ -799,7 +805,9 @@ $(function() {
             '<div id="hydrograph-3"></div>'
         );
         $('#panel-kge-rating').html('<p class="fw-bold text-center mt-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>KGE ratings are dependent on reach data, please wait.</p>')
+        seededNwmId = gage_feature.get('seeded_nwm_feature_id');
         baseNwmId = gage_feature.get('nwm_feature_id');
+        seededGeoglowsId = gage_feature.get('seeded_geoglows_river_id');
         baseGeoglowsId = gage_feature.get('geoglows_river_id');
         if (baseNwmId){
             feature_count +=1;

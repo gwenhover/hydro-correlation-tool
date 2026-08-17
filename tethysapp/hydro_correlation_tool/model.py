@@ -18,9 +18,11 @@ class hctTable(Base):
     longitude = Column(Float, nullable=False)
     geom = Column(Geometry('POINT', srid=4326), nullable=False)
     nwm_feature_id = Column(BigInteger, nullable=True)
+    seeded_nwm_feature_id = Column(BigInteger, nullable=True)
     nwm_kge_rating = Column(Float, nullable=True)
     nwm_kge_shared_dates = Column(BigInteger, nullable=True)
     geoglows_river_id = Column(BigInteger, nullable=True)
+    seeded_geoglows_river_id = Column(BigInteger, nullable=True)
     geoglows_kge_rating = Column(Float, nullable=True)
     geoglows_kge_shared_dates = Column(BigInteger, nullable=True)
     verification_status = Column(String, nullable=False, default='Unverified')
@@ -64,7 +66,7 @@ def create_row(row):
         geo_row = int(row['geoglows_river_id'])
 
     new_row = hctTable(usgs_id=row['usgs_id'], gage_name=row['gage_name'], latitude=row['latitude'], 
-                       longitude=row['longitude'], geom=geomPoint, nwm_feature_id=nwm_row,
-                       geoglows_river_id=geo_row)
+                       longitude=row['longitude'], geom=geomPoint, nwm_feature_id=nwm_row, seeded_nwm_feature_id=nwm_row,
+                       geoglows_river_id=geo_row, seeded_geoglows_river_id=geo_row)
     return(new_row)
 

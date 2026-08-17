@@ -129,7 +129,7 @@ UNREACHABLE_GAGES = (pd.read_csv(UNREACHABLE_CSV)['gages'].astype(str).to_list()
 )
 def db_get_gage(request):
     Engine = App.get_persistent_store_database('primary_db')
-    sql = 'SELECT usgs_id, nwm_feature_id, gage_name, geoglows_river_id, geom, verification_status FROM gage_mapping;'
+    sql = 'SELECT usgs_id, nwm_feature_id, gage_name, geoglows_river_id, geom, verification_status, seeded_nwm_feature_id, seeded_geoglows_river_id FROM gage_mapping;'
     # pandas 2.x requires SQLAlchemy>=2.0 to recognize an Engine directly, but
     # tethys_dataset_services pins sqlalchemy<2 — pass the raw DBAPI connection
     # instead so pandas' legacy DBAPI2 path (which read_postgis also uses) works.
@@ -178,8 +178,10 @@ def save_and_verify(request):
         if new_row is None:
             print("ERROR: Could not save or validate")
             return JsonResponse({"Error": "Could not save or validate"})
-        if new_row.nwm_feature_id is not None and new_row.geoglows_river_id is not None and int(new_row.nwm_feature_id) == nwm_final and int(new_row.geoglows_river_id) == geo_final and new_row.verification_status != 'Edited':
+        if new_row.seeded_nwm_feature_id is not None and new_row.seeded_geoglows_river_id is not None and int(new_row.seeded_nwm_feature_id) == nwm_final and int(new_row.seeded_geoglows_river_id) == geo_final:
             new_row.verification_status = 'Verified'
+            new_row.nwm_feature_id = nwm_final
+            new_row.geoglows_river_id = geo_final
         else:
             new_row.verification_status = 'Edited'
             new_row.nwm_feature_id = nwm_final
