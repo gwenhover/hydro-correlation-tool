@@ -38,7 +38,7 @@ class cacheTable(Base):
     end_date = Column(Date, nullable=False)
 
     
-SEED_CSV = os.path.join(os.path.dirname(__file__), 'public', 'data', 'seed.csv')
+MAPPING_CSV = os.path.join(os.path.dirname(__file__), 'public', 'data', 'gage_mapping.csv')
 
 def init_primary_db(engine, first_time):
     
@@ -47,8 +47,9 @@ def init_primary_db(engine, first_time):
     if first_time:
         Session = sessionmaker(bind=engine)  
         session = Session()                   
-        seed = pd.read_csv(SEED_CSV)
-        for index, row in seed.iterrows():
+        mapping = pd.read_csv(MAPPING_CSV, parse_dates=["last_modified_timestamp"], date_format='ISO8601')
+        mapping = mapping.astype(object).where(mapping.notna(), None)
+        for index, row in mapping.iterrows():
             session.add(create_row(row))       
         session.commit()                       
         session.close()                        
@@ -64,9 +65,32 @@ def create_row(row):
         geo_row = None
     else:
         geo_row = int(row['geoglows_river_id'])
-
+        
+    if (pd.isna(row['seeded_nwm_feature_id'])):
+        seeded_nwm_row = None
+    else:
+        seeded_nwm_row = int(row['seeded_nwm_feature_id'])
+        
+    if (pd.isna(row['seeded_geoglows_river_id'])):
+        seeded_geo_row = None
+    else:
+        seeded_geo_row = int(row['seeded_geoglows_river_id'])
+        
+    if (pd.isna(row['nwm_kge_shared_dates'])):
+        nwm_kge_shared = None
+    else:
+        nwm_kge_shared = int(row['nwm_kge_shared_dates'])
+        
+    if (pd.isna(row['geoglows_kge_shared_dates'])):
+        geo_kge_shared = None
+    else:
+        geo_kge_shared = int(row['geoglows_kge_shared_dates'])
+        
+        
     new_row = hctTable(usgs_id=row['usgs_id'], gage_name=row['gage_name'], latitude=row['latitude'], 
-                       longitude=row['longitude'], geom=geomPoint, nwm_feature_id=nwm_row, seeded_nwm_feature_id=nwm_row,
-                       geoglows_river_id=geo_row, seeded_geoglows_river_id=geo_row)
+                       longitude=row['longitude'], geom=geomPoint, nwm_feature_id=nwm_row, seeded_nwm_feature_id=seeded_nwm_row,
+                       geoglows_river_id=geo_row, seeded_geoglows_river_id=seeded_geo_row, nwm_kge_shared_dates=nwm_kge_shared, geoglows_kge_shared_dates=geo_kge_shared,
+                       nwm_kge_rating=row['nwm_kge_rating'], geoglows_kge_rating=row['geoglows_kge_rating'], verification_status=row['verification_status'],
+                       last_modified_by=row['last_modified_by'], last_modified_timestamp=row['last_modified_timestamp'])
     return(new_row)
 

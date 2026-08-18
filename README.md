@@ -145,9 +145,9 @@ An example row looks like:
 - Cannot currently handle multiple users caching or saving at the same time
 
 ## Development notes
-- public/data/seed.csv is what ```syncstores``` loads into the DB
+- public/data/gage_mapping.csv is what ```syncstores``` loads into the DB. gage_mapping.csv holds the current status of the crosswalk table as of 8-18-2026.
 - The gage layer loads from `tethysapp/hydro_correlation_tool/public/data/merged_gages.geojson` (~9,100 active CONUS gages).
-- Regenerate that file with the notebook in [`preprocessing/`](preprocessing/), which merges the USGS gage list with reach IDs, filters to CONUS, and prefixes each id as `USGS-…`.
+- Regenerate preprocessing files with notebooks and instructions found in [`preprocessing/README.md`](preprocessing/README.md).
 
 ## Project context
 
