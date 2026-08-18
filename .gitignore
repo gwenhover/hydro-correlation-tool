@@ -17,3 +17,6 @@ preprocessing/gage_vpu.csv
 # API token — never commit
 preprocessing/nwm_token.txt
 preprocessing/usgs_token.txt
+
+# Retrospective cache Parquet — 96 MB, published on HydroShare instead
+preprocessing/*.parquet

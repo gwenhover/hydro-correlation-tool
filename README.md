@@ -60,12 +60,14 @@ These instructions are for developers running their own instance. Curators don't
    ```
    tethys syncstores hydro_correlation_tool
    ```
-6. Start the portal
+6. Download cached retrospective data (optional)
+   If you would like to start your app with roughly 25,000 NWM, USGS, and GEOGLOWS retrospective streamflows, go to preprocessing/cache_loader_notebook.ipynb and run all cells---originally run in VS Code's extension. If not, this step may be ignored and you will be manually caching streamflow data as you use the app. 
+7. Start the portal
    ```
    tethys start
    ```
-7. Navigate to http://localhost:8000/apps/hydro-correlation-tool/ in a browser to see the app
-8. Log in with username 'admin' and password 'pass'
+8. Navigate to http://localhost:8000/apps/hydro-correlation-tool/ in a browser to see the app
+9. Log in with username 'admin' and password 'pass'
 
 ## Troubleshooting
 - **Database unable to start due to taken port?** Run `ss -ltn | grep :5436` to check if the port is available. If not, pick a different one in the 1024–49151 range and re-run.
