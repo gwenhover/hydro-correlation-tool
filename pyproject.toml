@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tethysapp-hydro_correlation_tool"
-description =  "The Hydro Correlation Tool is a single-user scientific workbench for building and maintaining a high-quality cross-mapping table that links each active USGS streamflow gage to orresponding NWM v3 reach and GEOGLOWS v2 river."
+description =  "The Hydro Correlation Tool is a single-user scientific workbench for building and maintaining a high-quality cross-mapping table that links each active USGS streamflow gage to corresponding NWM v3 reach and GEOGLOWS v2 river."
 
 keywords = ["NWM", "GEOGLOWS", "USGS Gages"]
 authors = [
