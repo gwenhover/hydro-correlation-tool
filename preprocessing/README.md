@@ -54,7 +54,7 @@ Note the two `seeded_*` columns. `nwm_feature_id` is the current answer, `seeded
 
 It lives on HydroShare as resource [`8c1ebe560d06475e9804ce8107d84142`](https://www.hydroshare.org/resource/8c1ebe560d06475e9804ce8107d84142/). To publish a newer one, replace the file on that resource rather than creating a new one — the loader's URL is hard-coded to that ID. The resource is deliberately shared as **Public, not Published**: HydroShare's "Publish" mints a DOI and makes the resource permanently immutable, which would make replacing the file impossible.
 
-**After re-uploading, update `EXPECTED_BYTES` in `cache_loader_notebook.ipynb` to the new file size.** The loader asserts on it to catch truncated downloads, so a stale value breaks the loader for everyone with a confusing size error rather than an obvious one.
+Nothing to update in the loader after re-uploading. It asks HydroShare for the file size instead of holding a constant, and re-downloads whenever the local copy doesn't match, so a republish reaches people on its own. It used to carry an `EXPECTED_BYTES` constant, which went stale on every republish and then failed for everyone with a size error that didn't say "your copy is old".
 
 Two things worth knowing before you re-export: the table is 483 MB of JSONB and roughly 4.35 GB once it's Python objects, so the notebook streams it a chunk at a time and never holds the whole thing — don't "simplify" that into a single `fetchall()`. And the export keeps a `dates` column instead of reconstructing dates from `start_date`, because 1,523 of the 24,893 rows have gaps in their daily series and would be silently corrupted otherwise.
 
