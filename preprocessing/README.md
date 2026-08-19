@@ -1,6 +1,6 @@
 # Preprocessing
 
-**You do not need to run any of this to run the app.** Everything these notebooks produce is already committed in `tethysapp/hydro_correlation_tool/public/data/`. Running them regenerates those files from scratch.
+**You do not need to run any of this to run the app.** Everything in here is already committed in `tethysapp/hydro_correlation_tool/public/data/`. Running it regenerates those files from scratch.
 
 The one thing you gain by running part of it is speed: the cache loader notebook pre-fills the retrospective cache so gages load instantly instead of fetching on first click. An empty cache does not mean a broken app, just a slower one. It fills as the app is used. The zarr backfills are the original source for the cache loader notebook, and may be used instead (though time consuming and resource intensive).
 
@@ -32,9 +32,13 @@ Run in this order. Each step's output is the next step's input.
    **`retrospective_download_usgs.ipynb`**
    Reads `seed.csv`. Same thing for the USGS side. Needs `usgs_token.txt` in this folder (gitignored).
 
-4. **`build_unreachable_gages.ipynb`**
-   Reads `seed.csv` + the cache. Finds gages that returned no data in the window.
-   Writes `public/data/unreachable_gages.csv`.
+4. **`rebuild_unreachable_gages.py`**
+   Reads `seed.csv`. Asks USGS directly which gages reported discharge in 2018–2022. It never touches the cache.
+   Writes `unreachable_gages.rebuilt.csv` (the greyed-out list) and `unreachable_audit.csv` (the evidence). It deliberately does not write into `tethysapp/` — copy the list over `public/data/unreachable_gages.csv` yourself once you've read the audit.
+
+   This step is a script, not a notebook — `python rebuild_unreachable_gages.py`. Budget about 90 minutes, and expect it to use up an hour of USGS quota. If it finishes with gages marked undetermined, rerun it with `--resume` once the quota resets; that only re-asks about those.
+
+   Read the docstring before changing anything in here. The old version defined "unreachable" as "missing from my cache", which quietly condemned 23 gages that had five full years of data. Two rules it explains: never let a fetch error count as "no data", and cross-check the output against non-empty cache rows before shipping — USGS under-reports some gages and the cache is the only thing that catches it.
 
 ## Refreshing the shipped crosswalk
 
@@ -52,19 +56,23 @@ It lives on HydroShare as resource [`8c1ebe560d06475e9804ce8107d84142`](https://
 
 **After re-uploading, update `EXPECTED_BYTES` in `cache_loader_notebook.ipynb` to the new file size.** The loader asserts on it to catch truncated downloads, so a stale value breaks the loader for everyone with a confusing size error rather than an obvious one.
 
-Two things worth knowing before you re-export: the table is 483 MB of JSONB and roughly 4.35 GB once it's Python objects, so the notebook streams it a chunk at a time and never holds the whole thing — don't "simplify" that into a single `fetchall()`. And the export keeps a `dates` column instead of reconstructing dates from `start_date`, because 1,582 of the 24,070 rows have gaps in their daily series and would be silently corrupted otherwise.
+Two things worth knowing before you re-export: the table is 483 MB of JSONB and roughly 4.35 GB once it's Python objects, so the notebook streams it a chunk at a time and never holds the whole thing — don't "simplify" that into a single `fetchall()`. And the export keeps a `dates` column instead of reconstructing dates from `start_date`, because 1,523 of the 24,893 rows have gaps in their daily series and would be silently corrupted otherwise.
 
 ## Migrations
 
 **`update_table.ipynb`** backfills `seeded_nwm_feature_id` and `seeded_geoglows_river_id` from `seed.csv`. Only needed for a database created before those columns existed — `model.py` populates them on a fresh install. It doesn't add the columns, so an older database needs an `ALTER TABLE` first.
 
-## One-off analysis
+## The unreachable list
 
-**`usgs_period_of_record.py`** + **`usgs_period_of_record.csv`** — checked which gages actually reported discharge in 2018–2022. 853 gages never will: 414 have no record at all, 439 only reported outside the window. That's why `unreachable_gages.csv` exists. No point re-running the downloads for them.
+**`unreachable_audit.csv`** is the evidence behind `unreachable_gages.csv` — one row per seed gage, with the declared record, the batched count, the individual count, first and last observation, the verdict, and which measurement decided it. Keep it. It's what stops the next person re-deriving the list from the cache.
+
+830 gages have no discharge in 2018–2022 and are greyed out in the app. Every one of them was fetched individually to confirm it, and all 830 sit in `retrospective_cache` as empty rows tagged `no_data`, so clicking a greyed gage costs no API call.
+
+Two of them, `USGS-01150900` and `USGS-03331500`, are *not* on the list even though USGS currently returns almost nothing for them — the cache holds 1,826 real days each. That's the under-reporting the script's docstring warns about.
 
 ## Known limitations
 
-- **The shipped cache is a frozen snapshot**, taken 2026-08-18. It holds 24,070 reaches (GEOGLOWS 8,309 · NWM 7,462 · USGS 8,299) over 2018–2022. Anything cached after that date isn't in it and will be fetched live until someone republishes. 55 rows carry empty value arrays — those are reaches the source genuinely returned nothing for, kept on purpose so they aren't re-requested forever.
+- **The shipped cache is a frozen snapshot**, taken 2026-08-19. It holds 24,893 reaches (GEOGLOWS 8,309 · NWM 7,471 · USGS 9,113) over 2018–2022. Anything cached after that date isn't in it and will be fetched live until someone republishes. 848 rows carry empty value arrays — 830 are the USGS gages we confirmed have nothing in the window, the rest are reach IDs someone mistyped into the app. They're kept on purpose so they aren't re-requested forever.
 - **The backfills key off the seeded IDs**, so the handful of reaches a curator corrected by hand may have no cache entry and will fetch live on first click.
 - **Bulk NWM data comes from Zarr, not the API, on purpose.** A 500-call test averaged 5.4s per reach — about 41 hours for a full backfill. The API is still the right tool for single on-demand reaches, which is how the app uses it in `fetchers.py`.
 

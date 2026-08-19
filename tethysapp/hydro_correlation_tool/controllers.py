@@ -82,7 +82,7 @@ def get_gage_info(request):
                 usgs_id, start_date, end_date,
                 api_key=App.get_custom_setting('USGS API Token'),
             )
-        if not gage_data.get("error"):
+        if not gage_data.get("error") or gage_data.get("error") == "no_data":
             new_row = cacheTable(network=network, reach_id=int(usgs_id.removeprefix("USGS-")), reach_data=gage_data, start_date=start_date, end_date=end_date)
             session.add(new_row)
             session.commit()
@@ -222,9 +222,7 @@ def compute_kge(request):
     try:
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         usgs_row = session.get(cacheTable, ("USGS", int(usgs_final)))
-        if usgs_row is None:
-            return JsonResponse({"Error": "Missing data, check selected IDs"})
-        if len(usgs_row.reach_data["dates"]) == 0:
+        if usgs_row is None or len(usgs_row.reach_data["dates"]) == 0:
             return JsonResponse({'nwm_kge': None, 'geo_kge': None, 'nwm_kge_length': None, 'geo_kge_length': None, 'unreachable': True})
         usgs_df = load_series(usgs_row)
         
@@ -261,7 +259,9 @@ def compute_kge(request):
             return JsonResponse({'nwm_kge': nwm_kge, 'geo_kge': float(geo_kge), 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
         if geo_kge is None:
             return JsonResponse({'nwm_kge': float(nwm_kge), 'geo_kge': geo_kge, 'nwm_kge_length': nwm_length, 'geo_kge_length': geo_length})
-        
+    except Exception as e:
+        print(f"KGE ERROR: {repr(e)}")
+        return JsonResponse({"Error": "Unknown error"})
     finally:
         session.close()
         

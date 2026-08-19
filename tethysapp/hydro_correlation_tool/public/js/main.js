@@ -759,13 +759,25 @@ $(function() {
         };
     });
 
+
     function select_gage(gage_feature, recenter_only){
-        if (gage_feature.get('unreachable') === true){
-            is_unreachable = true
-        }
-        else{
-            is_unreachable = false
-        }
+        function handleGageFailure(gage_generation, cur_msg, transient){
+            if (gage_generation !== selection_generation || cur_msg !== msg_generation) {
+                feature_done(cur_msg);
+                return;
+            }
+            msg_has_note = true;
+            if (transient){
+                $('#hydrograph-msg').html('<p class="text-muted">Could not load USGS data — undeterminable transient error, try again?.</p>');
+            }
+            else{
+                $('#hydrograph-msg').html(UNREACHABLE_NOTE);
+            }
+            feature_done(cur_msg);
+        };
+
+        is_unreachable = false
+        
         var gage_coords = gage_feature.getGeometry().getCoordinates()
         ol_map.getView().animate({
             center: gage_coords,
@@ -837,29 +849,31 @@ $(function() {
                 feature_done(cur_msg);
                 return;   // user has since selected a different gage (or cleared)
             }
-            if (data.dates.length === 0) {
-                if (cur_msg === msg_generation) {
-                    msg_has_note = true;
-                    $('#hydrograph-msg').html(UNREACHABLE_NOTE);
-                }
-                feature_done(cur_msg);
+            if (data.error && data.error == "transient"){
+                handleGageFailure(gage_generation, cur_msg, true);
                 return;
             }
-            
+            else if (data.error && data.error == "no_data"){
+                is_unreachable = true;
+                handleGageFailure(gage_generation, cur_msg, false);
+                return;
+            }
+            if (data.dates.length === 0){
+                is_unreachable = true;
+                handleGageFailure(gage_generation, cur_msg, false);
+                return;
+            }
+
             series_state['usgs'] = { 'dates': data.dates, 'values': data.values, 'name': 'USGS Observed' };
 
             feature_done(cur_msg);
             render_hydrograph();
 
         }).fail(function(){
-            if (gage_generation !== selection_generation || cur_msg !== msg_generation) {
-                feature_done(cur_msg);
-                return;
-            }
-            msg_has_note = true;
-            $('#hydrograph-msg').html('<p class="text-muted">Could not load USGS data — try re-selecting the gage.</p>');
-            feature_done(cur_msg);
+            handleGageFailure(gage_generation, cur_msg, true)
         });
+
+        
 
         // Seeded crosswalk candidates from the tile data: load whichever
         // exist alongside the observed series, so a gage click lands with
@@ -978,15 +992,15 @@ $(function() {
                 on_loaded();
                 return;
             }
+            if (cur_msg === msg_generation){
+                if (typed){
+                    commit_reach(river_id, network)
+                }
 
-            if (typed){
-                commit_reach(river_id, network)
+                series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
+                render_hydrograph();
             }
-
-            series_state[network.toLowerCase()] = { 'dates': data.dates, 'values': data.values, 'name': network };
             on_loaded();
-
-            render_hydrograph();
 
         }).fail(function(){
             if (reach_generation !== selection_generation || cur_msg !== msg_generation) {

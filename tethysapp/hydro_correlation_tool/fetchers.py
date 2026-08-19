@@ -23,7 +23,7 @@ def get_usgs_daily_discharge(usgs_id, start, end, api_key=None):
     
     if data is None or data.empty:
         print("No data")
-        return {"dates": [], "values": [], "units": None}
+        return {"dates": [], "values": [], "units": None, "error": "no_data"}
     
     return {
         "dates": data["time"].dt.strftime("%Y-%m-%d").tolist(),
