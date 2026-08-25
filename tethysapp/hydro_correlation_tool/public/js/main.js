@@ -1159,7 +1159,8 @@ $(function() {
                 var layout = {
                     title: trace.name,
                     xaxis: { title: 'Date' },
-                    yaxis: { title: 'Discharge (' + current_unit + ')' }
+                    yaxis: { title: 'Discharge (' + current_unit + ')' },
+                    height: Math.round(window.innerHeight * (0.58))
                 };
                 // Share the scale only when there's a real positive peak; a
                 // [0, 0] range would be degenerate, so fall back to auto then.
