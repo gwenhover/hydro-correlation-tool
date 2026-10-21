@@ -38,7 +38,9 @@ flowchart TD
     USGSDA[("NEW · usgs_drainage_area table<br/>USGS drainage area cache")] <--> DA
     DA --> DAPILLS["NEW · Panel: NWM DA ratio / GEO DA ratio pills<br/>coloured by PASS · MARGINAL · FAIL · NO DATA"]
 
-    KGEPILLS --> REASON["NEW · Reason for verifying (required)<br/>Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
+    KGEPILLS --> SAVEPOP["Save popup: KGE for the staged IDs<br/>NEW: NWM / GEOGLOWS DA ratio for the staged IDs"]
+    DA --> SAVEPOP
+    SAVEPOP --> REASON["NEW · Reason for verifying (required)<br/>Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
     DAPILLS -. "advisory only, never blocks Save" .-> REASON
     REASON --> SAVE["Save and Verify<br/>Verified if both IDs = seed, else Edited<br/>stores IDs + KGE in gage_mapping<br/>NEW: refused without a valid reason"]
     SAVE --> DB
@@ -97,6 +99,8 @@ NO DATA  if USGS_DA, US or DS is missing or <= 0 (headwater reach: US = 0 is all
 
 The panel shows one pill per model, `NWM DA ratio: 0.94` / `GEO DA ratio: 1.04`, coloured by class with the KGE colours: PASS green, MARGINAL dark gold, FAIL red, NO DATA grey and dashed (ratio shown as N/A). The class word appears in the pill's tooltip. The drainage areas themselves are in the export CSV.
 
+The Save and Verify popup also shows `GEOGLOWS DA ratio` / `NWM DA ratio` under its KGE lines, as coloured text in the same style, for the **staged** IDs about to be saved. It loads in parallel with KGE when the popup opens and never affects the Save button.
+
 **GEOGLOWS units check.** The GEOGLOWS v2 docs don't give units for `USContArea`/`DSContArea`. The raw values divided by the USGS drainage area in km² came out at about 1,000,000 at four large gages, so the values are in **m²**:
 
 | Gage | USGS DA (km²) | GEOGLOWS river | Raw `DSContArea` | Raw ÷ USGS km² | GEO DS (km²) | NWM DS (km²) |
@@ -130,3 +134,4 @@ The button stays disabled until KGE has loaded **and** a valid reason is chosen.
 | 2026-10-20 | Added DA Analysis: drainage-area check under the KGE pills and 9 DA columns in the export CSV | Pre-download DA tables, App workspace, DA Analysis, usgs_drainage_area, DA pills, append_da_columns |
 | 2026-10-20 | DA pills now show the ratio value (coloured by class) instead of the class word; the USGS/US/DS detail lines under the pills were removed | DA pills |
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
+| 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |

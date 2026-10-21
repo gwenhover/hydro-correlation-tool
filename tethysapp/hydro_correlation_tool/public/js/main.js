@@ -487,6 +487,7 @@ $(function() {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
         $("#save-confirm-footer").prop("disabled", true);
         reset_verification_reason();
+        display_save_da(staged_nwm, staged_geoglows, selectedUsgsId);
         $("#save-and-verify").prop("disabled", true);
         $("#usgs-id").text("    USGS ID: " + selectedUsgsId);
         $("#geo-id").text( "GEOGLOWS ID: " + staged_geoglows);
@@ -1161,6 +1162,46 @@ $(function() {
         }).fail(function(){
             if (seq === da_request_seq) {
                 $('#panel-da-analysis').remove();
+            }
+        });
+    }
+
+    // Same check in the Save and Verify popup, for the staged IDs about to be
+    // saved. Text lines styled like the popup's KGE lines. Advisory only: it
+    // never touches the confirm button or the save payload.
+    var save_da_request_seq = 0;
+
+    function save_da_text(label, result){
+        var ratio = (result === null || result.ratio === null) ? 'N/A' : result.ratio.toFixed(2);
+        var col = (result === null) ? DA_COLORS['NO DATA'] : DA_COLORS[result['class']];
+        var tip = (result === null) ? 'NO DATA' : result['class'] + ' · ' + DA_RULE;
+        return {text: label + ' DA ratio: ' + ratio, color: col, title: tip};
+    }
+
+    function show_save_da(geo_result, nwm_result){
+        var geo = save_da_text('GEOGLOWS', geo_result);
+        var nwm = save_da_text('     NWM', nwm_result);
+        $('#geo-da').text(geo.text).css('color', geo.color).attr('title', geo.title);
+        $('#nwm-da').text(nwm.text).css('color', nwm.color).attr('title', nwm.title);
+    }
+
+    function display_save_da(nwm_id, geoglows_id, usgs_id){
+        var seq = ++save_da_request_seq;
+        $('#geo-da').text('GEOGLOWS DA ratio loading').css('color', '').removeAttr('title');
+        $('#nwm-da').text('NWM DA ratio loading').css('color', '').removeAttr('title');
+        $.get(DA_ANALYSIS_URL, {usgs_id: usgs_id, nwm_id: nwm_id, geo_id: geoglows_id}, function(data){
+            // The popup was reopened for other IDs since this request.
+            if (seq !== save_da_request_seq) {
+                return;
+            }
+            if ("Error" in data){
+                show_save_da(null, null);
+                return;
+            }
+            show_save_da(data.geoglows, data.nwm);
+        }).fail(function(){
+            if (seq === save_da_request_seq) {
+                show_save_da(null, null);
             }
         });
     }
