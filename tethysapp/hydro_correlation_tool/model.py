@@ -94,3 +94,59 @@ def create_row(row):
                        last_modified_by=row['last_modified_by'], last_modified_timestamp=row['last_modified_timestamp'])
     return(new_row)
 
+
+
+class UsgsDrainageArea(Base):
+    # DA Analysis cache of USGS drainage areas, filled on first use (panel
+    # click or CSV export) so the export doesn't call USGS for every gage.
+    # A NULL area means USGS reports none for that gage; failed requests are
+    # never stored, so they are retried next time.
+    __tablename__ = 'usgs_drainage_area'
+    usgs_id = Column(String, primary_key=True, nullable=False)
+    drainage_area_sq_mi = Column(Float, nullable=True)
+    drainage_area_km2 = Column(Float, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), nullable=False)
+
+
+# Verification reasons offered in the Save and Verify popup (home.html renders
+# this list, so the dropdown and the server check can't drift apart).
+VERIFICATION_OTHER = 'Other'
+VERIFICATION_REASONS = (
+    'Matched KGE only',
+    'Matched DA only',
+    'Matched both KGE and DA',
+    'Visual match (map location / hydrograph)',
+    VERIFICATION_OTHER,
+)
+VERIFICATION_COMMENT_MAX = 500
+
+
+def clean_verification_reason(reason, comment):
+    # Returns (reason, comment), or (None, None) when the save must be refused:
+    # the reason is required, and "Other" needs a typed comment. A comment is
+    # only kept for "Other" -- the popup only offers the text box there.
+    reason = (reason or '').strip()
+    comment = (comment or '').strip()
+    if reason not in VERIFICATION_REASONS:
+        return None, None
+    if reason != VERIFICATION_OTHER:
+        return reason, None
+    if not comment or len(comment) > VERIFICATION_COMMENT_MAX:
+        return None, None
+    return reason, comment
+
+
+class VerificationLog(Base):
+    # One row per Save and Verify, written in the same transaction as the
+    # gage_mapping update, so the history of who verified what and why is
+    # kept even when a gage is re-verified. The export uses the latest row.
+    __tablename__ = 'verification_log'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    usgs_id = Column(String, nullable=False, index=True)
+    nwm_feature_id = Column(BigInteger, nullable=True)
+    geoglows_river_id = Column(BigInteger, nullable=True)
+    verification_status = Column(String, nullable=False)
+    reason = Column(String, nullable=False)
+    comment = Column(String, nullable=True)
+    username = Column(String, nullable=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False)

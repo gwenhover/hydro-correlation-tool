@@ -13,6 +13,10 @@ from django.utils import timezone
 from datetime import datetime
 import math
 import os
+from .fetchers import da_reference_ready, ensure_da_reference_tables, start_da_reference_download, lookup_da_reference, get_usgs_drainage_areas
+from .model import UsgsDrainageArea
+from .da_analysis import build_da_columns, da_result, nwm_us_ds, geoglows_us_ds, sq_mi_to_km2
+from .model import VerificationLog, VERIFICATION_REASONS, clean_verification_reason
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -59,6 +63,7 @@ def home(request):
         'map_view': map_view,
         'mapbox_token': App.get_custom_setting('MapBox PK Token'),
         'headwater_threshold': App.get_custom_setting('Headwater Threshold') or 2,
+        'verification_reasons': VERIFICATION_REASONS,
     }
 
     return App.render(request, 'home.html', context)
@@ -174,6 +179,11 @@ def save_and_verify(request):
             geo_kge_length = int(geo_kge_length)
         else:
             geo_kge_length = None
+        verification_reason, verification_comment = clean_verification_reason(request.POST.get('verification_reason'), request.POST.get('verification_comment'))
+        if verification_reason is None:
+            print("ERROR: Could not save or validate\nCode: missing or invalid verification reason")
+            return JsonResponse({"Error": "Could not save or validate"})
+        ensure_verification_log_table(Engine)
         new_row = session.get(hctTable, f"USGS-{usgs_final}")
         if new_row is None:
             print("ERROR: Could not save or validate")
@@ -193,6 +203,7 @@ def save_and_verify(request):
         new_row.geoglows_kge_shared_dates = geo_kge_length
         new_row.last_modified_by = request.user.username
         new_row.last_modified_timestamp = timezone.now()
+        session.add(VerificationLog(usgs_id=new_row.usgs_id, nwm_feature_id=nwm_final, geoglows_river_id=geo_final, verification_status=verification_status, reason=verification_reason, comment=verification_comment, username=new_row.last_modified_by, timestamp=new_row.last_modified_timestamp))
         
         session.commit()
     except Exception as e:
@@ -323,6 +334,8 @@ def export_csv (request):
         df_table['nwm_kge_shared_dates'] = df_table['nwm_kge_shared_dates'].astype("Int64")
         df_table['geoglows_kge_shared_dates'] = df_table['geoglows_kge_shared_dates'].astype("Int64")
         df_table['last_modified_timestamp'] = df_table['last_modified_timestamp'].dt.strftime('%Y-%m-%d %H:%M %Z')
+        df_table = append_da_columns(df_table)
+        df_table = append_verification_columns(df_table)
         csv_string = df_table.to_csv(index=False)
         time_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         my_response = HttpResponse(csv_string, content_type="text/csv")
@@ -330,3 +343,153 @@ def export_csv (request):
     finally:
         raw_conn.close()
     return my_response
+
+
+# --- DA Analysis -------------------------------------------------------------
+# Advisory drainage-area check shown under the KGE pills and appended to the
+# export CSV. It never touches gage_mapping and never blocks Save and Verify.
+
+_usgs_da_table_ready = False
+
+
+def cached_usgs_da_km2(Engine, usgs_ids):
+    # {usgs_id: km2 or None}, from the usgs_drainage_area table, fetching from
+    # USGS (in batches) only the gages not cached yet.
+    global _usgs_da_table_ready
+    if not _usgs_da_table_ready:
+        # Created here rather than relying on init_primary_db, so databases
+        # set up before this table existed get it without a syncstores run.
+        UsgsDrainageArea.__table__.create(Engine, checkfirst=True)
+        _usgs_da_table_ready = True
+    Session = sessionmaker(bind=Engine)
+    session = Session()
+    try:
+        wanted = set(usgs_ids)
+        cached = {
+            row.usgs_id: row.drainage_area_km2
+            for row in session.query(UsgsDrainageArea).filter(UsgsDrainageArea.usgs_id.in_(wanted))
+        }
+        missing = sorted(wanted - cached.keys())
+        if missing:
+            found, failed = get_usgs_drainage_areas(missing, api_key=App.get_custom_setting('USGS API Token'))
+            now = timezone.now()
+            for usgs_id, sq_mi in found.items():
+                km2 = sq_mi_to_km2(sq_mi)
+                session.merge(UsgsDrainageArea(usgs_id=usgs_id, drainage_area_sq_mi=sq_mi, drainage_area_km2=km2, fetched_at=now))
+                cached[usgs_id] = km2
+            try:
+                session.commit()
+            except Exception as e:
+                # e.g. another request cached the same gage first -- the values
+                # we fetched are still good for this response.
+                print("USGS drainage area cache write failed:", repr(e))
+                session.rollback()
+        return cached
+    finally:
+        session.close()
+
+
+def _model_us_ds(network, reach_id):
+    if not reach_id:
+        return None, None
+    reference = lookup_da_reference(network, [reach_id])
+    if int(reach_id) not in reference.index:
+        return None, None
+    row = reference.loc[int(reach_id)]
+    if network == 'NWM':
+        return nwm_us_ds(row['totdasqkm'], row['areasqkm'])
+    return geoglows_us_ds(row['USContArea'], row['DSContArea'])
+
+
+@controller(
+    name='da_analysis',
+    url='da-analysis',
+)
+def da_analysis(request):
+    try:
+        raw_usgs = request.GET.get('usgs_id')
+        nwm_id = request.GET.get('nwm_id')
+        geo_id = request.GET.get('geo_id')
+        nwm_id = int(nwm_id) if nwm_id else None
+        geo_id = int(geo_id) if geo_id else None
+
+        usgs_da = None
+        if raw_usgs:
+            usgs_id = f"USGS-{raw_usgs.removeprefix('USGS-')}"
+            Engine = App.get_persistent_store_database('primary_db')
+            usgs_da = cached_usgs_da_km2(Engine, [usgs_id]).get(usgs_id)
+
+        if da_reference_ready():
+            reference = 'ready'
+            nwm_us, nwm_ds = _model_us_ds('NWM', nwm_id)
+            geo_us, geo_ds = _model_us_ds('GEOGLOWS', geo_id)
+        else:
+            # First use on this server: download in the background, answer NO DATA now.
+            start_da_reference_download()
+            reference = 'downloading'
+            nwm_us = nwm_ds = geo_us = geo_ds = None
+
+        return JsonResponse({
+            'reference': reference,
+            'nwm': da_result(usgs_da, nwm_us, nwm_ds),
+            'geoglows': da_result(usgs_da, geo_us, geo_ds),
+        })
+    except Exception as e:
+        print("DA ERROR: " + repr(e))
+        return JsonResponse({"Error": "DA analysis failed"})
+
+
+def append_da_columns(df_table):
+    # Export hook. DA is computed from the saved IDs on each row. Any failure
+    # gives NO DATA columns rather than a failed export.
+    try:
+        Engine = App.get_persistent_store_database('primary_db')
+        usgs_da = cached_usgs_da_km2(Engine, df_table['usgs_id'].tolist())
+        ensure_da_reference_tables()
+        nwm_reference = lookup_da_reference('NWM', df_table['nwm_feature_id'])
+        geoglows_reference = lookup_da_reference('GEOGLOWS', df_table['geoglows_river_id'])
+    except Exception as e:
+        print("DA export ERROR: " + repr(e))
+        usgs_da = {}
+        nwm_reference = pd.DataFrame(columns=['totdasqkm', 'areasqkm'])
+        geoglows_reference = pd.DataFrame(columns=['USContArea', 'DSContArea'])
+    return build_da_columns(df_table, usgs_da, nwm_reference, geoglows_reference)
+
+
+# --- Verification reason -----------------------------------------------------
+# The reason chosen in the Save and Verify popup is logged in verification_log
+# by save_and_verify; the export appends each gage's latest reason.
+
+_verification_log_table_ready = False
+
+
+def ensure_verification_log_table(Engine):
+    # Created on first use, so databases set up before this table existed get
+    # it without a syncstores run.
+    global _verification_log_table_ready
+    if not _verification_log_table_ready:
+        VerificationLog.__table__.create(Engine, checkfirst=True)
+        _verification_log_table_ready = True
+
+
+def append_verification_columns(df_table):
+    # Export hook: verification_reason / verification_comment from each gage's
+    # latest save. Blank for gages never saved since reasons were added; any
+    # failure gives blank columns rather than a failed export.
+    sql = 'SELECT DISTINCT ON (usgs_id) usgs_id, reason AS verification_reason, comment AS verification_comment FROM verification_log ORDER BY usgs_id, timestamp DESC, id DESC;'
+    try:
+        Engine = App.get_persistent_store_database('primary_db')
+        ensure_verification_log_table(Engine)
+        raw_conn = Engine.raw_connection()
+        try:
+            latest = pd.read_sql(sql, raw_conn)
+        finally:
+            raw_conn.close()
+    except Exception as e:
+        print("Verification reason export ERROR: " + repr(e))
+        latest = pd.DataFrame(columns=['usgs_id', 'verification_reason', 'verification_comment'])
+    latest = latest.set_index('usgs_id')
+    df_table = df_table.copy()
+    df_table['verification_reason'] = df_table['usgs_id'].map(latest['verification_reason'])
+    df_table['verification_comment'] = df_table['usgs_id'].map(latest['verification_comment'])
+    return df_table

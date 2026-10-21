@@ -62,6 +62,12 @@ These instructions are for developers running their own instance. Curators don't
    ```
 6. Download cached retrospective data (optional)
    If you would like to start your app with roughly 25,000 NWM, USGS, and GEOGLOWS retrospective streamflows, go to preprocessing/cache_loader_notebook.ipynb and run all cells---originally run in VS Code's extension. If not, this step may be ignored and you will be manually caching streamflow data as you use the app. 
+
+   **DA reference tables (recommended):** DA Analysis needs two public drainage-area tables (NHDPlusV2 VAA and the GEOGLOWS v2 model table, ~500 MB download, ~140 MB kept in the app workspace). Download them once so no one waits on the first click:
+   ```
+   python -m tethysapp.hydro_correlation_tool.fetchers
+   ```
+   If skipped, the app downloads them in the background the first time DA is shown.
 7. Start the portal
    ```
    tethys start
@@ -95,6 +101,7 @@ A user verifies a gage through this process:
 3. Test other reaches (if necessary) and find the best fit for this particular gage
 4. Type the corresponding IDs into the box above "Save and Verify", or pick the reaches off the map (recommended)
 5. Click "Save and Verify"
+   - Choose a reason for verifying (required): Matched KGE only, Matched DA only, Matched both KGE and DA, Visual match (map location / hydrograph), or Other (type why). The reason is logged with your username and exported.
 6. Confirm
 7. Move to the next gage
 
@@ -109,6 +116,11 @@ A user verifies a gage through this process:
    - Red (poor): KGE < -0.41
 
    Note that the KGE rating is not the final factor in deciding if a reach corresponds to a certain gage. Sometimes a model vastly overpredicts but still has the correct timing, which could lead to a red KGE score while being the correct reach.
+- DA Analysis: under the KGE pills, a drainage-area check for each model compares the USGS gage's drainage area with the upstream (US) and downstream (DS) drainage area of the selected reach. The pill shows the ratio DS / USGS DA, coloured by class with the same colours as KGE. It is advisory only and never blocks Save and Verify. See [docs/methodology.md](docs/methodology.md) for sources and formula.
+   - PASS (green): US×0.9 ≤ USGS DA ≤ DS×1.1
+   - MARGINAL (yellow): US×0.8 ≤ USGS DA ≤ DS×1.2
+   - FAIL (red): otherwise
+   - NO DATA (grey): a drainage area is missing
 - Pink highlighted reaches are the seeded best guess of the preprocessing notebook, yellow reaches are currently selected.
 - Multi-user attribution. The app records the logged-in username in last_modified_by on every save. If several curators share a portal, give each their own account rather than sharing admin — otherwise the column can't tell you who verified what. On our portal that's done with ENABLE_OPEN_SIGNUP plus ENABLE_RESTRICTED_APP_ACCESS, with users added to a Curators group that grants access to this app. Accounts provide attribution, not concurrency safety — see Known limitations.
 ## Output
@@ -132,6 +144,10 @@ The output and end-goal of this app is a table that contains the corresponding U
 
 An example row looks like:
 ![Example Rainbow CSV verified row](docs/README_Picture_2.png)
+
+The exported CSV also appends 9 DA Analysis columns, computed from the saved IDs on each row: `usgs_da_km2, nwm_da_us_km2, nwm_da_ds_km2, nwm_da_ratio, nwm_da_class, geoglows_da_us_km2, geoglows_da_ds_km2, geoglows_da_ratio, geoglows_da_class`. The first export fetches USGS drainage areas for every gage (about 20 s); later exports use the cache.
+
+After those, `verification_reason` and `verification_comment` give the reason chosen at each gage's latest Save and Verify (blank for gages not saved since reasons were added). The full history of every save is kept in the `verification_log` table.
 
 ## Known bugs and future work
 
