@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, BigInteger, DateTime, Date
+from sqlalchemy import Column, String, Float, BigInteger, DateTime, Date, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
@@ -8,7 +8,13 @@ import hydroeval as he
 from sqlalchemy.dialects.postgresql import JSONB
 
 
-Base = declarative_base()  
+Base = declarative_base()
+
+CACHE_URL = (
+    "https://www.hydroshare.org/resource/8c1ebe560d06475e9804ce8107d84142"
+    "/data/contents/hydro_correlation_retrospective_cache_2018_2022.parquet"
+)
+CACHE_PATH = "/tmp/hydro_correlation_retrospective_cache_2018_2022.parquet"
 
 class hctTable(Base):
     __tablename__ = 'gage_mapping'
@@ -41,18 +47,112 @@ class cacheTable(Base):
 MAPPING_CSV = os.path.join(os.path.dirname(__file__), 'public', 'data', 'gage_mapping.csv')
 
 def init_primary_db(engine, first_time):
-    
+
     Base.metadata.create_all(engine)
 
     if first_time:
-        Session = sessionmaker(bind=engine)  
-        session = Session()                   
+        Session = sessionmaker(bind=engine)
+        session = Session()
         mapping = pd.read_csv(MAPPING_CSV, parse_dates=["last_modified_timestamp"], date_format='ISO8601')
         mapping = mapping.astype(object).where(mapping.notna(), None)
         for index, row in mapping.iterrows():
-            session.add(create_row(row))       
-        session.commit()                       
-        session.close()                        
+            session.add(create_row(row))
+        session.commit()
+        session.close()
+
+    if os.environ.get('HCT_SEED_CACHE', '1') == '1':
+        try:
+            seed_retrospective_cache(engine)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                'retrospective_cache seed skipped (%s); the app will fill the '
+                'cache lazily instead', exc)
+
+def _download_cache_parquet(path):
+    """Download the HydroShare cache parquet unless a complete copy is present.
+
+    Verifies against the server's Content-Length and the PAR1 magic bytes so a
+    truncated download or an HTML error page is caught rather than handed to
+    the reader.
+    """
+    import requests
+
+    def complete(p):
+        if not os.path.exists(p) or os.path.getsize(p) < 8:
+            return False
+        with open(p, 'rb') as f:
+            head = f.read(4)
+            f.seek(-4, os.SEEK_END)
+            tail = f.read(4)
+        return head == b'PAR1' and tail == b'PAR1'
+
+    with requests.get(CACHE_URL, stream=True, timeout=120) as r:
+        r.raise_for_status()
+        remote_bytes = int(r.headers['Content-Length'])
+        if os.path.exists(path) and os.path.getsize(path) == remote_bytes and complete(path):
+            return
+        with open(path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                f.write(chunk)
+    assert os.path.getsize(path) == remote_bytes, 'size mismatch after download'
+    assert complete(path), 'not a complete parquet file'
+
+def seed_retrospective_cache(engine, force=False):
+    """Bulk-load retrospective_cache from the public HydroShare parquet.
+
+    Idempotent: reaches already present are skipped (ON CONFLICT DO NOTHING) and,
+    unless force is set, a table that already holds rows short-circuits before
+    any download. Commits one parquet row group at a time so an interrupted run
+    resumes. Returns (inserted, skipped).
+    """
+    import json
+    import pyarrow.parquet as pq
+
+    if not force:
+        with engine.connect() as conn:
+            if conn.execute(text('SELECT 1 FROM retrospective_cache LIMIT 1')).first():
+                return (0, 0)
+
+    _download_cache_parquet(CACHE_PATH)
+
+    existing = set()
+    with engine.connect() as conn:
+        for row in conn.execute(text('SELECT network, reach_id FROM retrospective_cache')):
+            existing.add((row[0], row[1]))
+
+    insert_sql = text('''
+        INSERT INTO retrospective_cache (network, reach_id, reach_data, start_date, end_date)
+        VALUES (:network, :reach_id, CAST(:reach_data AS jsonb), :start_date, :end_date)
+        ON CONFLICT (network, reach_id) DO NOTHING
+    ''')
+
+    inserted = 0
+    skipped = 0
+    parquet_file = pq.ParquetFile(CACHE_PATH)
+    for batch in parquet_file.iter_batches(batch_size=500):
+        params = []
+        for row in batch.to_pylist():
+            if (row['network'], row['reach_id']) in existing:
+                skipped += 1
+                continue
+            reach_data = {
+                'dates': [d.isoformat() for d in row['dates']],
+                'units': row['units'],
+                'values': row['values'],
+            }
+            params.append({
+                'network': row['network'],
+                'reach_id': row['reach_id'],
+                'reach_data': json.dumps(reach_data),
+                'start_date': row['start_date'],
+                'end_date': row['end_date'],
+            })
+        if params:
+            with engine.begin() as conn:
+                conn.execute(insert_sql, params)
+            inserted += len(params)
+    return (inserted, skipped)
 
 def create_row(row):
     geomPoint = WKTElement(f"POINT({row['longitude']} {row['latitude']})", srid=4326)
