@@ -486,6 +486,8 @@ $(function() {
         const modalEl = document.getElementById("save-modal");
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
         $("#save-confirm-footer").prop("disabled", true);
+        reset_verification_reason();
+        display_save_da(staged_nwm, staged_geoglows, selectedUsgsId);
         $("#save-and-verify").prop("disabled", true);
         $("#usgs-id").text("    USGS ID: " + selectedUsgsId);
         $("#geo-id").text( "GEOGLOWS ID: " + staged_geoglows);
@@ -551,6 +553,8 @@ $(function() {
             }
             $("#save-and-verify").prop("disabled", false);
             $("#save-confirm-footer").prop("disabled", false);
+            save_kge_ready = true;
+            update_verification_reason();
             $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge_text).css("color", geo_color);
             $("#nwm-kge").text("     NWM KGE: " + nwm_kge_text).css("color", nwm_color);
             
@@ -572,7 +576,7 @@ $(function() {
     });
 
     $('#save-confirm-footer').on('click', function() {
-        $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId}, function(data){
+        $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId, verification_reason: $('#verification-reason').val(), verification_comment: verification_comment_value()}, function(data){
             if ("Error" in data){
                 nwm_kge = null;
                 geo_kge = null;
@@ -625,6 +629,35 @@ $(function() {
         });
         
     })
+
+    // --- Verification reason -----------------------------------------------
+    // Required in the Save and Verify popup. The confirm button is enabled only
+    // once the KGE request has finished AND a valid reason is chosen ("Other"
+    // also needs typed text). The server checks the reason again.
+    var save_kge_ready = false;
+
+    function verification_comment_value(){
+        return ($('#verification-reason').val() === 'Other') ? $('#verification-comment').val().trim() : '';
+    }
+
+    function reset_verification_reason(){
+        save_kge_ready = false;
+        $('#verification-reason').val('');
+        $('#verification-comment').val('');
+        update_verification_reason();
+    }
+
+    function update_verification_reason(){
+        var reason = $('#verification-reason').val();
+        var is_other = (reason === 'Other');
+        $('#verification-other').toggle(is_other);
+        $('#verification-comment-count').text($('#verification-comment').val().length);
+        var valid = (reason !== '') && (!is_other || verification_comment_value() !== '');
+        $('#save-confirm-footer').prop('disabled', !(save_kge_ready && valid));
+    }
+
+    $('#verification-reason').on('change', update_verification_reason);
+    $('#verification-comment').on('input', update_verification_reason);
 
     // --- Click handling ----------------------------------------------------
 
@@ -1081,11 +1114,98 @@ $(function() {
             $('#panel-kge-rating').html(
                 '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 15px">' + '<span style="color: ' + nwm_col + '; border: 2px '+ nwm_border + ' ' + nwm_col + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">NWM KGE: ' + nwm_text + '</span>' + '<span style="color: ' + geo_col + '; border: 2px '+ geo_border + ' ' + geo_col +'; padding: 4px 12px; border-radius: 20px; justify-self: start;">GEO KGE: ' + geo_text + '</span>' + '</h4>'
             )
+            display_da(nwm_id, geoglows_id, usgs_id);
 
         }).fail(function(){
             $('#panel-kge-rating').empty()
         });
     }
+
+    // --- DA Analysis -------------------------------------------------------
+    // Drainage-area check drawn inside #panel-kge-rating, under the KGE pills,
+    // so every place that resets that panel clears DA as well. Advisory only:
+    // nothing here feeds the Save and Verify payload.
+    var da_request_seq = 0;
+    var DA_COLORS = {'PASS': 'green', 'MARGINAL': 'darkgoldenrod', 'FAIL': 'red', 'NO DATA': '#5a5f66'};
+    var DA_RULE = 'PASS: US×0.9 ≤ USGS DA ≤ DS×1.1 · MARGINAL: US×0.8 ≤ USGS DA ≤ DS×1.2 · otherwise FAIL';
+
+    function da_pill(label, result){
+        // Shows the ratio (DS / USGS DA), colored by its class with the same pill
+        // style and colors as the KGE pills; NO DATA is N/A, dashed like KGE N/A.
+        // The class word lives in the tooltip.
+        var col = DA_COLORS[result['class']];
+        var border = (result['class'] === 'NO DATA') ? 'dashed' : 'solid';
+        var ratio = (result.ratio === null) ? 'N/A' : result.ratio.toFixed(2);
+        return '<span title="' + result['class'] + ' · ' + DA_RULE + '" style="color: ' + col + '; border: 2px ' + border + ' ' + col + '; padding: 4px 12px; border-radius: 20px; justify-self: start;">' + label + ' DA ratio: ' + ratio + '</span>';
+    }
+
+    function display_da(nwm_id, geoglows_id, usgs_id){
+        var seq = ++da_request_seq;
+        $('#panel-kge-rating').append('<div id="panel-da-analysis" class="small text-muted mt-2">Checking drainage areas...</div>');
+        $.get(DA_ANALYSIS_URL, {usgs_id: usgs_id, nwm_id: nwm_id, geo_id: geoglows_id}, function(data){
+            // A newer gage/reach selection has redrawn the panel since this request.
+            if (seq !== da_request_seq) {
+                return;
+            }
+            if ("Error" in data){
+                $('#panel-da-analysis').remove();
+                return;
+            }
+            var note = '';
+            if (data.reference === 'downloading'){
+                note = '<p class="small text-muted mb-0">Drainage-area reference tables are downloading on the server; reselect the gage in a few minutes.</p>';
+            }
+            $('#panel-da-analysis').removeClass('small text-muted mt-2').html(
+                '<h4 style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; margin-top: 10px; margin-bottom: 4px">' + da_pill('NWM', data.nwm) + da_pill('GEO', data.geoglows) + '</h4>'
+                + note
+            );
+        }).fail(function(){
+            if (seq === da_request_seq) {
+                $('#panel-da-analysis').remove();
+            }
+        });
+    }
+
+    // Same check in the Save and Verify popup, for the staged IDs about to be
+    // saved. Text lines styled like the popup's KGE lines. Advisory only: it
+    // never touches the confirm button or the save payload.
+    var save_da_request_seq = 0;
+
+    function save_da_text(label, result){
+        var ratio = (result === null || result.ratio === null) ? 'N/A' : result.ratio.toFixed(2);
+        var col = (result === null) ? DA_COLORS['NO DATA'] : DA_COLORS[result['class']];
+        var tip = (result === null) ? 'NO DATA' : result['class'] + ' · ' + DA_RULE;
+        return {text: label + ' DA ratio: ' + ratio, color: col, title: tip};
+    }
+
+    function show_save_da(geo_result, nwm_result){
+        var geo = save_da_text('GEOGLOWS', geo_result);
+        var nwm = save_da_text('     NWM', nwm_result);
+        $('#geo-da').text(geo.text).css('color', geo.color).attr('title', geo.title);
+        $('#nwm-da').text(nwm.text).css('color', nwm.color).attr('title', nwm.title);
+    }
+
+    function display_save_da(nwm_id, geoglows_id, usgs_id){
+        var seq = ++save_da_request_seq;
+        $('#geo-da').text('GEOGLOWS DA ratio loading').css('color', '').removeAttr('title');
+        $('#nwm-da').text('NWM DA ratio loading').css('color', '').removeAttr('title');
+        $.get(DA_ANALYSIS_URL, {usgs_id: usgs_id, nwm_id: nwm_id, geo_id: geoglows_id}, function(data){
+            // The popup was reopened for other IDs since this request.
+            if (seq !== save_da_request_seq) {
+                return;
+            }
+            if ("Error" in data){
+                show_save_da(null, null);
+                return;
+            }
+            show_save_da(data.geoglows, data.nwm);
+        }).fail(function(){
+            if (seq === save_da_request_seq) {
+                show_save_da(null, null);
+            }
+        });
+    }
+
     function render_hydrograph(save_mode) {
 
         if (Object.keys(series_state).length === 0) {
