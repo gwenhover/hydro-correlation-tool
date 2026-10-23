@@ -158,6 +158,7 @@ The button stays disabled until KGE has loaded **and** both models have a valid 
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
 | 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |
 | 2026-10-23 | The verification reason is now asked per model (NWM and GEOGLOWS): two required dropdowns, 4 reason/comment columns in `verification_log` and in the export | Reason for verifying, verification_log, append_verification_columns |
+| 2026-10-23 | Review fix (PR #38): the upgrade uses `ADD COLUMN IF NOT EXISTS`, so two app pods running it at the same moment don't error | verification_log |
 | 2026-10-23 | `verification_log` created by the single-reason version is upgraded on first use (`upgrade_verification_log_table`): the 4 per-model columns are added and the old `reason` becomes optional; old rows are kept | verification_log |
 | 2026-10-23 | Added a "Find a gage" search box (USGS ID or name) over the top-left of the map | Find a gage |
 | 2026-10-23 | Documentation only: added the NHDPlusV2 User Guide definitions of `AreaSqKm` / `TotDASqKm` and the citation behind the NWM US/DS formula | — |

@@ -488,7 +488,7 @@ def upgrade_verification_log_table(Engine):
     with Engine.begin() as conn:
         for column in ('nwm_reason', 'nwm_comment', 'geoglows_reason', 'geoglows_comment'):
             if column not in columns:
-                conn.execute(text('ALTER TABLE verification_log ADD COLUMN ' + column + ' VARCHAR'))
+                conn.execute(text('ALTER TABLE verification_log ADD COLUMN IF NOT EXISTS ' + column + ' VARCHAR'))
         conn.execute(text('ALTER TABLE verification_log ALTER COLUMN reason DROP NOT NULL'))
 
 
