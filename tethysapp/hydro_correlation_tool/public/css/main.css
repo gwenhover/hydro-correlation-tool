@@ -294,3 +294,66 @@
     font-size: 15px;
     color: #1a1a1a;
 }
+
+/* Gage search box, over the map to the right of the zoom buttons and of
+   Tethys's basemap button (#basemap_dropdown_container, left: 40px, ~30px wide). */
+.gage-search {
+    top: 0.5em;
+    left: 84px;
+    width: 300px;
+    max-width: calc(100% - 84px - 4em);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 3px;
+}
+
+.gage-search .form-control {
+    font-size: 13px;
+}
+
+.gage-search-list {
+    display: none;
+    margin-top: 3px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.gage-search-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.gage-search-item.active,
+.gage-search-item:hover {
+    background: rgba(13, 110, 253, 0.12);
+}
+
+.gage-search-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.gage-search-id {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.gage-search-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gage-search-note {
+    padding: 6px 8px;
+    font-size: 12px;
+    color: #555;
+}

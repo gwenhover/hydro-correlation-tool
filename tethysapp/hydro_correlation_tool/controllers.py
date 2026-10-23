@@ -17,6 +17,7 @@ from .fetchers import da_reference_ready, ensure_da_reference_tables, start_da_r
 from .model import UsgsDrainageArea
 from .da_analysis import build_da_columns, da_result, nwm_us_ds, geoglows_us_ds, sq_mi_to_km2
 from .model import VerificationLog, VERIFICATION_REASONS, clean_verification_reason
+from sqlalchemy import inspect, text
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -64,6 +65,7 @@ def home(request):
         'mapbox_token': App.get_custom_setting('MapBox PK Token'),
         'headwater_threshold': App.get_custom_setting('Headwater Threshold') or 2,
         'verification_reasons': VERIFICATION_REASONS,
+        'verification_models': (('geoglows', 'GEOGLOWS'), ('nwm', 'NWM')),
     }
 
     return App.render(request, 'home.html', context)
@@ -179,9 +181,10 @@ def save_and_verify(request):
             geo_kge_length = int(geo_kge_length)
         else:
             geo_kge_length = None
-        verification_reason, verification_comment = clean_verification_reason(request.POST.get('verification_reason'), request.POST.get('verification_comment'))
-        if verification_reason is None:
-            print("ERROR: Could not save or validate\nCode: missing or invalid verification reason")
+        nwm_reason, nwm_comment = clean_verification_reason(request.POST.get('nwm_verification_reason'), request.POST.get('nwm_verification_comment'))
+        geo_reason, geo_comment = clean_verification_reason(request.POST.get('geoglows_verification_reason'), request.POST.get('geoglows_verification_comment'))
+        if nwm_reason is None or geo_reason is None:
+            print("ERROR: Could not save or validate\nCode: missing or invalid NWM/GEOGLOWS verification reason")
             return JsonResponse({"Error": "Could not save or validate"})
         ensure_verification_log_table(Engine)
         new_row = session.get(hctTable, f"USGS-{usgs_final}")
@@ -203,7 +206,7 @@ def save_and_verify(request):
         new_row.geoglows_kge_shared_dates = geo_kge_length
         new_row.last_modified_by = request.user.username
         new_row.last_modified_timestamp = timezone.now()
-        session.add(VerificationLog(usgs_id=new_row.usgs_id, nwm_feature_id=nwm_final, geoglows_river_id=geo_final, verification_status=verification_status, reason=verification_reason, comment=verification_comment, username=new_row.last_modified_by, timestamp=new_row.last_modified_timestamp))
+        session.add(VerificationLog(usgs_id=new_row.usgs_id, nwm_feature_id=nwm_final, geoglows_river_id=geo_final, verification_status=verification_status, nwm_reason=nwm_reason, nwm_comment=nwm_comment, geoglows_reason=geo_reason, geoglows_comment=geo_comment, username=new_row.last_modified_by, timestamp=new_row.last_modified_timestamp))
         
         session.commit()
     except Exception as e:
@@ -457,8 +460,10 @@ def append_da_columns(df_table):
 
 
 # --- Verification reason -----------------------------------------------------
-# The reason chosen in the Save and Verify popup is logged in verification_log
-# by save_and_verify; the export appends each gage's latest reason.
+# The NWM and GEOGLOWS reasons chosen in the Save and Verify popup are logged in
+# verification_log by save_and_verify; the export appends each gage's latest.
+
+VERIFICATION_EXPORT_COLUMNS = ['nwm_verification_reason', 'nwm_verification_comment', 'geoglows_verification_reason', 'geoglows_verification_comment']
 
 _verification_log_table_ready = False
 
@@ -469,14 +474,32 @@ def ensure_verification_log_table(Engine):
     global _verification_log_table_ready
     if not _verification_log_table_ready:
         VerificationLog.__table__.create(Engine, checkfirst=True)
+        upgrade_verification_log_table(Engine)
         _verification_log_table_ready = True
 
 
+def upgrade_verification_log_table(Engine):
+    # Databases that ran the single-reason version have verification_log with
+    # one required reason/comment. Add the per-model columns and let the old
+    # reason be empty, so new saves fit; old rows are kept as they are.
+    columns = {column['name'] for column in inspect(Engine).get_columns('verification_log')}
+    if 'reason' not in columns:
+        return
+    with Engine.begin() as conn:
+        for column in ('nwm_reason', 'nwm_comment', 'geoglows_reason', 'geoglows_comment'):
+            if column not in columns:
+                conn.execute(text('ALTER TABLE verification_log ADD COLUMN IF NOT EXISTS ' + column + ' VARCHAR'))
+        conn.execute(text('ALTER TABLE verification_log ALTER COLUMN reason DROP NOT NULL'))
+
+
 def append_verification_columns(df_table):
-    # Export hook: verification_reason / verification_comment from each gage's
-    # latest save. Blank for gages never saved since reasons were added; any
-    # failure gives blank columns rather than a failed export.
-    sql = 'SELECT DISTINCT ON (usgs_id) usgs_id, reason AS verification_reason, comment AS verification_comment FROM verification_log ORDER BY usgs_id, timestamp DESC, id DESC;'
+    # Export hook: the NWM and GEOGLOWS reason/comment from each gage's latest
+    # save. Blank for gages never saved since reasons were added; any failure
+    # gives blank columns rather than a failed export.
+    sql = ('SELECT DISTINCT ON (usgs_id) usgs_id, '
+           'nwm_reason AS nwm_verification_reason, nwm_comment AS nwm_verification_comment, '
+           'geoglows_reason AS geoglows_verification_reason, geoglows_comment AS geoglows_verification_comment '
+           'FROM verification_log ORDER BY usgs_id, timestamp DESC, id DESC;')
     try:
         Engine = App.get_persistent_store_database('primary_db')
         ensure_verification_log_table(Engine)
@@ -487,9 +510,9 @@ def append_verification_columns(df_table):
             raw_conn.close()
     except Exception as e:
         print("Verification reason export ERROR: " + repr(e))
-        latest = pd.DataFrame(columns=['usgs_id', 'verification_reason', 'verification_comment'])
+        latest = pd.DataFrame(columns=['usgs_id'] + VERIFICATION_EXPORT_COLUMNS)
     latest = latest.set_index('usgs_id')
     df_table = df_table.copy()
-    df_table['verification_reason'] = df_table['usgs_id'].map(latest['verification_reason'])
-    df_table['verification_comment'] = df_table['usgs_id'].map(latest['verification_comment'])
+    for column in VERIFICATION_EXPORT_COLUMNS:
+        df_table[column] = df_table['usgs_id'].map(latest[column])
     return df_table

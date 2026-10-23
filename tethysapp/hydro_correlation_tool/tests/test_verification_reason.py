@@ -1,5 +1,6 @@
 """
-Tests for the Save and Verify reason check (model.clean_verification_reason).
+Tests for the Save and Verify reason check (model.clean_verification_reason),
+which save_and_verify runs once for NWM and once for GEOGLOWS.
 
     python -m unittest -v tethysapp.hydro_correlation_tool.tests.test_verification_reason
 """

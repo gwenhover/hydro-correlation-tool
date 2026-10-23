@@ -2,7 +2,7 @@
 
 How the Hydro Correlation Tool works, from the seeded IDs to the exported crosswalk CSV. **Keep this file up to date with every change to the app** and add a line to the [change log](#change-log).
 
-Green boxes marked **NEW** were added on the `add-DA-Analysis` branch (DA Analysis and the Save and Verify reason, 2026-10-20).
+Green boxes marked **NEW** were added on the `add-DA-Analysis` branch (DA Analysis and the Save and Verify reason, 2026-10-20; gage search, 2026-10-23).
 
 ```mermaid
 flowchart TD
@@ -21,6 +21,8 @@ flowchart TD
 
     DB --> MAP["Map loads gages<br/>db_get_gage → GeoJSON<br/>unreachable gages greyed out"]
     MAP --> CLICK["User clicks a gage<br/>seeded NWM + GEOGLOWS IDs staged"]
+    MAP --> SEARCH["NEW · Find a gage box (top-left of the map)<br/>USGS ID or name, searched in the loaded gages<br/>main.js find_gages"]
+    SEARCH -- "opens the match like a click (select_gage)" --> CLICK
     CLICK -. "user may pick other reaches on the map" .-> CLICK
 
     CLICK --> USGS["USGS daily discharge<br/>get_gage_info · dataretrieval"]
@@ -40,22 +42,22 @@ flowchart TD
 
     KGEPILLS --> SAVEPOP["Save popup: KGE for the staged IDs<br/>NEW: NWM / GEOGLOWS DA ratio for the staged IDs"]
     DA --> SAVEPOP
-    SAVEPOP --> REASON["NEW · Reason for verifying (required)<br/>Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
+    SAVEPOP --> REASON["NEW · Reason for verifying, one per model (required)<br/>GEOGLOWS and NWM, each: Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
     DAPILLS -. "advisory only, never blocks Save" .-> REASON
     REASON --> SAVE["Save and Verify<br/>Verified if both IDs = seed, else Edited<br/>stores IDs + KGE in gage_mapping<br/>NEW: refused without a valid reason"]
     SAVE --> DB
-    SAVE --> VLOG[("NEW · verification_log table<br/>one row per save: reason, comment, user, time")]
+    SAVE --> VLOG[("NEW · verification_log table<br/>one row per save: NWM + GEOGLOWS reason and comment, user, time")]
 
     DB --> EXPORT["Export CSV<br/>export_csv · existing columns unchanged"]
     EXPORT --> DACOLS["NEW · append_da_columns<br/>+9 DA columns from the saved IDs"]
     DAREF --> DACOLS
     USGSDA --> DACOLS
-    DACOLS --> VCOLS["NEW · append_verification_columns<br/>+verification_reason, verification_comment<br/>from each gage's latest save"]
+    DACOLS --> VCOLS["NEW · append_verification_columns<br/>+NWM and GEOGLOWS verification reason + comment<br/>from each gage's latest save"]
     VLOG --> VCOLS
     VCOLS --> CSV["reach_id_crosswalk_TIMESTAMP_UTC.csv"]
 
     classDef new fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
-    class DAPRE,DAREF,DA,USGSDA,DAPILLS,DACOLS,REASON,VLOG,VCOLS new;
+    class DAPRE,DAREF,DA,USGSDA,DAPILLS,DACOLS,REASON,VLOG,VCOLS,SEARCH new;
 ```
 
 ## Steps
@@ -67,10 +69,11 @@ flowchart TD
 | Load cache (optional) | `preprocessing/cache_loader_notebook.ipynb` | HydroShare parquet | `retrospective_cache` |
 | **NEW** Pre-download DA tables | `fetchers.py` `ensure_da_reference_tables` | NHDPlusV2 VAA, GEOGLOWS v2 model table | App workspace `da_reference/` |
 | Map | `controllers.py` `db_get_gage`, `main.js` | `gage_mapping`, `unreachable_gages.csv` | — |
+| **NEW** Find a gage | `main.js` gage search control (`find_gages`, `open_search_match`), `main.css` | Gage features already loaded for the map | — (opens the gage with `select_gage`) |
 | Fetch series | `controllers.py` `get_gage_info` / `get_reach_info`, `fetchers.py` | Cache first, then USGS / NWM API / GEOGLOWS S3 | `retrospective_cache` (temporary errors are not cached) |
 | KGE | `controllers.py` `compute_kge` | `retrospective_cache` | — (recalculated every time) |
 | **NEW** DA Analysis | `controllers.py` `da_analysis`, `da_analysis.py`, `main.js` `display_da` | `usgs_drainage_area` (USGS API on a miss), DA reference tables | `usgs_drainage_area` |
-| Save and Verify | `controllers.py` `save_and_verify`, **NEW** reason dropdown in the Save popup (`home.html`, `main.js`) | Staged IDs, KGE, **NEW** reason + comment | `gage_mapping`, **NEW** `verification_log` (same transaction) |
+| Save and Verify | `controllers.py` `save_and_verify`, **NEW** NWM and GEOGLOWS reason dropdowns in the Save popup (`home.html`, `main.js`) | Staged IDs, KGE, **NEW** reason + comment per model | `gage_mapping`, **NEW** `verification_log` (same transaction) |
 | Export | `controllers.py` `export_csv` (+ **NEW** `append_da_columns`, `append_verification_columns`) | `gage_mapping`, DA sources, `verification_log` | CSV download |
 
 ## DA Analysis (new)
@@ -86,6 +89,16 @@ An advisory check that the gage's drainage area fits the drainage area of the ch
 | GEOGLOWS v2 (river_id = LINKNO) | `USContArea` × 1e-6 | `DSContArea` × 1e-6 | GEOGLOWS v2 model table, `https://geoglows-v2.s3-us-west-2.amazonaws.com/tables/v2-model-table.parquet` (the file `geoglows.data.metadata_table()` reads; 6,838,900 rivers; 245,506,513 bytes, downloaded 2026-10-20) |
 
 NHDPlus rounding can make `TotDASqKM − AreaSqKM` slightly negative on a headwater reach. Values between −0.01 and 0 km² are treated as US = 0.
+
+**NHDPlusV2 field definitions** (McKay et al., 2012). The PlusFlowlineVAA table points `AreaSqKm` to the Catchment table and `TotDASqKm` / `DivDASqKm` to the CumulativeArea table (pp. 52–53). They are defined as:
+
+- `AreaSqKm`: *"Catchment area in square kilometers"* (Catchment feature class, p. 47). The catchment's FeatureID equals the flowline's ComID, so this is that one reach's local catchment, without anything upstream.
+- `TotDASqKm`: *"Total Upstream Cumulative Drainage Area, in square kilometers, at the downstream end of the NHDFlowline feature"* (CumulativeArea table, p. 47).
+- `DivDASqKm`: *"Divergence-routed Cumulative Drainage Area, in square kilometers, at the downstream end of the NHDFlowline feature"* (same table). Not used here.
+
+So `TotDASqKM` is the drainage area at the downstream end of the reach (DS), and subtracting the reach's own catchment gives the area at its upstream end (US). The guide does not state this subtraction itself; it follows from the two definitions. It holds wherever streams only join; at divergences (where a river splits) `TotDASqKM` is not simply upstream total + local catchment, which is why a clearly negative US is reported as NO DATA.
+
+> McKay, L., Bondelid, T., Dewald, T., Johnston, J., Moore, R., and Rea, A. (2012). *NHDPlus Version 2: User Guide* (Data Model Version 2.1, updated March 13, 2019). U.S. Environmental Protection Agency. pp. 47, 52–53. https://www.epa.gov/system/files/documents/2023-04/NHDPlusV2_User_Guide.pdf
 
 **Classification** (`da_analysis.py`, t = `DA_TOLERANCE` = 0.10)
 
@@ -115,17 +128,26 @@ The Save and Verify popup also shows `GEOGLOWS DA ratio` / `NWM DA ratio` under 
 **Export.** All existing columns stay in the same order; these are appended, computed from the IDs saved on each row:
 `usgs_da_km2, nwm_da_us_km2, nwm_da_ds_km2, nwm_da_ratio, nwm_da_class, geoglows_da_us_km2, geoglows_da_ds_km2, geoglows_da_ratio, geoglows_da_class`
 
+## Find a gage (new)
+
+A search box over the top-left of the map, to the right of the zoom buttons and the basemap (layers) button. It searches the ~9,100 gages that are already loaded for the map, so it sends no request to the server.
+
+- **By ID:** `06934500`, `USGS-06934500` and `usgs 06934500` are the same search. Part of an ID also works (`069345`). Exact matches come first, then IDs that start with the digits, then IDs that contain them.
+- **By name:** every typed word must start a word of the gage name, upper or lower case (`missouri river at` finds "Missouri River at Hermann" but not "... near Great Falls"). Names that start with the first word come first.
+- Up to 10 matches are listed, each with a dot in its status colour. Click one, or use the arrow keys and **Enter** (Enter alone takes the top match). **Esc** closes the list.
+- The chosen gage opens through `select_gage`, exactly like clicking its dot: the map flies to it and the panel, hydrograph, KGE and DA load as usual. If that status is hidden by the legend filter, the gage still opens and a note says its dot is not drawn.
+
 ## Verification reason (new)
 
-Choosing a reason is **required** before **Save and verify** can be clicked in the Save popup. The choices are in `model.py` `VERIFICATION_REASONS`, which `home.html` uses to draw the dropdown, so the dropdown and the server check always match:
+The NWM and GEOGLOWS reaches are judged separately, so the Save popup asks for a reason **for each model**: a "Reason for verifying GEOGLOWS" and a "Reason for verifying NWM" dropdown (in the same order as the popup's KGE and DA lines). Both are **required** before **Save and verify** can be clicked. The choices are in `model.py` `VERIFICATION_REASONS`, which `home.html` uses to draw both dropdowns, so the dropdowns and the server check always match:
 
 - Matched KGE only
 - Matched DA only
 - Matched both KGE and DA
 - Visual match (map location / hydrograph)
-- Other: a text box appears and must be filled in (up to 500 characters)
+- Other: a text box appears under that model's dropdown and must be filled in (up to 500 characters)
 
-The button stays disabled until KGE has loaded **and** a valid reason is chosen. The server checks the reason again (`clean_verification_reason`) and refuses the save without one. Each save adds a row to `verification_log` (usgs_id, saved IDs, status, reason, comment, username, timestamp) in the same transaction as the `gage_mapping` update, so a re-verified gage keeps its full history. The export appends `verification_reason` and `verification_comment` from each gage's **latest** save; gages not saved since this feature was added are blank.
+The button stays disabled until KGE has loaded **and** both models have a valid reason. The server checks each model's reason again (`clean_verification_reason`, once per model) and refuses the save if either is missing. A comment is kept only where that model's reason is "Other". A `verification_log` left by the earlier single-reason version (one required `reason`/`comment`) is upgraded the first time it is used: `upgrade_verification_log_table` adds the four per-model columns and makes the old `reason` optional, keeping old rows unchanged. Each save adds a row to `verification_log` (usgs_id, saved IDs, status, `nwm_reason`, `nwm_comment`, `geoglows_reason`, `geoglows_comment`, username, timestamp) in the same transaction as the `gage_mapping` update, so a re-verified gage keeps its full history. The export appends `nwm_verification_reason`, `nwm_verification_comment`, `geoglows_verification_reason` and `geoglows_verification_comment` from each gage's **latest** save; gages not saved since this feature was added are blank.
 
 ## Change log
 
@@ -135,3 +157,8 @@ The button stays disabled until KGE has loaded **and** a valid reason is chosen.
 | 2026-10-20 | DA pills now show the ratio value (coloured by class) instead of the class word; the USGS/US/DS detail lines under the pills were removed | DA pills |
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
 | 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |
+| 2026-10-23 | The verification reason is now asked per model (NWM and GEOGLOWS): two required dropdowns, 4 reason/comment columns in `verification_log` and in the export | Reason for verifying, verification_log, append_verification_columns |
+| 2026-10-23 | Review fix (PR #38): the upgrade uses `ADD COLUMN IF NOT EXISTS`, so two app pods running it at the same moment don't error | verification_log |
+| 2026-10-23 | `verification_log` created by the single-reason version is upgraded on first use (`upgrade_verification_log_table`): the 4 per-model columns are added and the old `reason` becomes optional; old rows are kept | verification_log |
+| 2026-10-23 | Added a "Find a gage" search box (USGS ID or name) over the top-left of the map | Find a gage |
+| 2026-10-23 | Documentation only: added the NHDPlusV2 User Guide definitions of `AreaSqKm` / `TotDASqKm` and the citation behind the NWM US/DS formula | — |

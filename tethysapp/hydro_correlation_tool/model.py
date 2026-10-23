@@ -208,8 +208,9 @@ class UsgsDrainageArea(Base):
     fetched_at = Column(DateTime(timezone=True), nullable=False)
 
 
-# Verification reasons offered in the Save and Verify popup (home.html renders
-# this list, so the dropdown and the server check can't drift apart).
+# Verification reasons offered in the Save and Verify popup, one dropdown per
+# model (NWM and GEOGLOWS). home.html renders this list, so the dropdowns and
+# the server check can't drift apart.
 VERIFICATION_OTHER = 'Other'
 VERIFICATION_REASONS = (
     'Matched KGE only',
@@ -222,7 +223,8 @@ VERIFICATION_COMMENT_MAX = 500
 
 
 def clean_verification_reason(reason, comment):
-    # Returns (reason, comment), or (None, None) when the save must be refused:
+    # Checks one model's reason. Returns (reason, comment), or (None, None)
+    # when the save must be refused:
     # the reason is required, and "Other" needs a typed comment. A comment is
     # only kept for "Other" -- the popup only offers the text box there.
     reason = (reason or '').strip()
@@ -239,14 +241,18 @@ def clean_verification_reason(reason, comment):
 class VerificationLog(Base):
     # One row per Save and Verify, written in the same transaction as the
     # gage_mapping update, so the history of who verified what and why is
-    # kept even when a gage is re-verified. The export uses the latest row.
+    # kept even when a gage is re-verified. Each model has its own reason,
+    # since the NWM and GEOGLOWS reaches are judged separately. The export
+    # uses the latest row.
     __tablename__ = 'verification_log'
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     usgs_id = Column(String, nullable=False, index=True)
     nwm_feature_id = Column(BigInteger, nullable=True)
     geoglows_river_id = Column(BigInteger, nullable=True)
     verification_status = Column(String, nullable=False)
-    reason = Column(String, nullable=False)
-    comment = Column(String, nullable=True)
+    nwm_reason = Column(String, nullable=False)
+    nwm_comment = Column(String, nullable=True)
+    geoglows_reason = Column(String, nullable=False)
+    geoglows_comment = Column(String, nullable=True)
     username = Column(String, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False)
