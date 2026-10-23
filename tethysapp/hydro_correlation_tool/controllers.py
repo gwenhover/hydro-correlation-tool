@@ -17,6 +17,7 @@ from .fetchers import da_reference_ready, ensure_da_reference_tables, start_da_r
 from .model import UsgsDrainageArea
 from .da_analysis import build_da_columns, da_result, nwm_us_ds, geoglows_us_ds, sq_mi_to_km2
 from .model import VerificationLog, VERIFICATION_REASONS, clean_verification_reason
+from sqlalchemy import inspect, text
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -473,7 +474,22 @@ def ensure_verification_log_table(Engine):
     global _verification_log_table_ready
     if not _verification_log_table_ready:
         VerificationLog.__table__.create(Engine, checkfirst=True)
+        upgrade_verification_log_table(Engine)
         _verification_log_table_ready = True
+
+
+def upgrade_verification_log_table(Engine):
+    # Databases that ran the single-reason version have verification_log with
+    # one required reason/comment. Add the per-model columns and let the old
+    # reason be empty, so new saves fit; old rows are kept as they are.
+    columns = {column['name'] for column in inspect(Engine).get_columns('verification_log')}
+    if 'reason' not in columns:
+        return
+    with Engine.begin() as conn:
+        for column in ('nwm_reason', 'nwm_comment', 'geoglows_reason', 'geoglows_comment'):
+            if column not in columns:
+                conn.execute(text('ALTER TABLE verification_log ADD COLUMN ' + column + ' VARCHAR'))
+        conn.execute(text('ALTER TABLE verification_log ALTER COLUMN reason DROP NOT NULL'))
 
 
 def append_verification_columns(df_table):
