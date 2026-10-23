@@ -40,17 +40,17 @@ flowchart TD
 
     KGEPILLS --> SAVEPOP["Save popup: KGE for the staged IDs<br/>NEW: NWM / GEOGLOWS DA ratio for the staged IDs"]
     DA --> SAVEPOP
-    SAVEPOP --> REASON["NEW · Reason for verifying (required)<br/>Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
+    SAVEPOP --> REASON["NEW · Reason for verifying, one per model (required)<br/>GEOGLOWS and NWM, each: Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
     DAPILLS -. "advisory only, never blocks Save" .-> REASON
     REASON --> SAVE["Save and Verify<br/>Verified if both IDs = seed, else Edited<br/>stores IDs + KGE in gage_mapping<br/>NEW: refused without a valid reason"]
     SAVE --> DB
-    SAVE --> VLOG[("NEW · verification_log table<br/>one row per save: reason, comment, user, time")]
+    SAVE --> VLOG[("NEW · verification_log table<br/>one row per save: NWM + GEOGLOWS reason and comment, user, time")]
 
     DB --> EXPORT["Export CSV<br/>export_csv · existing columns unchanged"]
     EXPORT --> DACOLS["NEW · append_da_columns<br/>+9 DA columns from the saved IDs"]
     DAREF --> DACOLS
     USGSDA --> DACOLS
-    DACOLS --> VCOLS["NEW · append_verification_columns<br/>+verification_reason, verification_comment<br/>from each gage's latest save"]
+    DACOLS --> VCOLS["NEW · append_verification_columns<br/>+NWM and GEOGLOWS verification reason + comment<br/>from each gage's latest save"]
     VLOG --> VCOLS
     VCOLS --> CSV["reach_id_crosswalk_TIMESTAMP_UTC.csv"]
 
@@ -70,7 +70,7 @@ flowchart TD
 | Fetch series | `controllers.py` `get_gage_info` / `get_reach_info`, `fetchers.py` | Cache first, then USGS / NWM API / GEOGLOWS S3 | `retrospective_cache` (temporary errors are not cached) |
 | KGE | `controllers.py` `compute_kge` | `retrospective_cache` | — (recalculated every time) |
 | **NEW** DA Analysis | `controllers.py` `da_analysis`, `da_analysis.py`, `main.js` `display_da` | `usgs_drainage_area` (USGS API on a miss), DA reference tables | `usgs_drainage_area` |
-| Save and Verify | `controllers.py` `save_and_verify`, **NEW** reason dropdown in the Save popup (`home.html`, `main.js`) | Staged IDs, KGE, **NEW** reason + comment | `gage_mapping`, **NEW** `verification_log` (same transaction) |
+| Save and Verify | `controllers.py` `save_and_verify`, **NEW** NWM and GEOGLOWS reason dropdowns in the Save popup (`home.html`, `main.js`) | Staged IDs, KGE, **NEW** reason + comment per model | `gage_mapping`, **NEW** `verification_log` (same transaction) |
 | Export | `controllers.py` `export_csv` (+ **NEW** `append_da_columns`, `append_verification_columns`) | `gage_mapping`, DA sources, `verification_log` | CSV download |
 
 ## DA Analysis (new)
@@ -86,6 +86,16 @@ An advisory check that the gage's drainage area fits the drainage area of the ch
 | GEOGLOWS v2 (river_id = LINKNO) | `USContArea` × 1e-6 | `DSContArea` × 1e-6 | GEOGLOWS v2 model table, `https://geoglows-v2.s3-us-west-2.amazonaws.com/tables/v2-model-table.parquet` (the file `geoglows.data.metadata_table()` reads; 6,838,900 rivers; 245,506,513 bytes, downloaded 2026-10-20) |
 
 NHDPlus rounding can make `TotDASqKM − AreaSqKM` slightly negative on a headwater reach. Values between −0.01 and 0 km² are treated as US = 0.
+
+**NHDPlusV2 field definitions** (McKay et al., 2012). The PlusFlowlineVAA table points `AreaSqKm` to the Catchment table and `TotDASqKm` / `DivDASqKm` to the CumulativeArea table (pp. 52–53). They are defined as:
+
+- `AreaSqKm`: *"Catchment area in square kilometers"* (Catchment feature class, p. 47). The catchment's FeatureID equals the flowline's ComID, so this is that one reach's local catchment, without anything upstream.
+- `TotDASqKm`: *"Total Upstream Cumulative Drainage Area, in square kilometers, at the downstream end of the NHDFlowline feature"* (CumulativeArea table, p. 47).
+- `DivDASqKm`: *"Divergence-routed Cumulative Drainage Area, in square kilometers, at the downstream end of the NHDFlowline feature"* (same table). Not used here.
+
+So `TotDASqKM` is the drainage area at the downstream end of the reach (DS), and subtracting the reach's own catchment gives the area at its upstream end (US). The guide does not state this subtraction itself; it follows from the two definitions. It holds wherever streams only join; at divergences (where a river splits) `TotDASqKM` is not simply upstream total + local catchment, which is why a clearly negative US is reported as NO DATA.
+
+> McKay, L., Bondelid, T., Dewald, T., Johnston, J., Moore, R., and Rea, A. (2012). *NHDPlus Version 2: User Guide* (Data Model Version 2.1, updated March 13, 2019). U.S. Environmental Protection Agency. pp. 47, 52–53. https://www.epa.gov/system/files/documents/2023-04/NHDPlusV2_User_Guide.pdf
 
 **Classification** (`da_analysis.py`, t = `DA_TOLERANCE` = 0.10)
 
@@ -117,15 +127,15 @@ The Save and Verify popup also shows `GEOGLOWS DA ratio` / `NWM DA ratio` under 
 
 ## Verification reason (new)
 
-Choosing a reason is **required** before **Save and verify** can be clicked in the Save popup. The choices are in `model.py` `VERIFICATION_REASONS`, which `home.html` uses to draw the dropdown, so the dropdown and the server check always match:
+The NWM and GEOGLOWS reaches are judged separately, so the Save popup asks for a reason **for each model**: a "Reason for verifying GEOGLOWS" and a "Reason for verifying NWM" dropdown (in the same order as the popup's KGE and DA lines). Both are **required** before **Save and verify** can be clicked. The choices are in `model.py` `VERIFICATION_REASONS`, which `home.html` uses to draw both dropdowns, so the dropdowns and the server check always match:
 
 - Matched KGE only
 - Matched DA only
 - Matched both KGE and DA
 - Visual match (map location / hydrograph)
-- Other: a text box appears and must be filled in (up to 500 characters)
+- Other: a text box appears under that model's dropdown and must be filled in (up to 500 characters)
 
-The button stays disabled until KGE has loaded **and** a valid reason is chosen. The server checks the reason again (`clean_verification_reason`) and refuses the save without one. Each save adds a row to `verification_log` (usgs_id, saved IDs, status, reason, comment, username, timestamp) in the same transaction as the `gage_mapping` update, so a re-verified gage keeps its full history. The export appends `verification_reason` and `verification_comment` from each gage's **latest** save; gages not saved since this feature was added are blank.
+The button stays disabled until KGE has loaded **and** both models have a valid reason. The server checks each model's reason again (`clean_verification_reason`, once per model) and refuses the save if either is missing. A comment is kept only where that model's reason is "Other". Each save adds a row to `verification_log` (usgs_id, saved IDs, status, `nwm_reason`, `nwm_comment`, `geoglows_reason`, `geoglows_comment`, username, timestamp) in the same transaction as the `gage_mapping` update, so a re-verified gage keeps its full history. The export appends `nwm_verification_reason`, `nwm_verification_comment`, `geoglows_verification_reason` and `geoglows_verification_comment` from each gage's **latest** save; gages not saved since this feature was added are blank.
 
 ## Change log
 
@@ -135,3 +145,5 @@ The button stays disabled until KGE has loaded **and** a valid reason is chosen.
 | 2026-10-20 | DA pills now show the ratio value (coloured by class) instead of the class word; the USGS/US/DS detail lines under the pills were removed | DA pills |
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
 | 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |
+| 2026-10-23 | The verification reason is now asked per model (NWM and GEOGLOWS): two required dropdowns, 4 reason/comment columns in `verification_log` and in the export | Reason for verifying, verification_log, append_verification_columns |
+| 2026-10-23 | Documentation only: added the NHDPlusV2 User Guide definitions of `AreaSqKm` / `TotDASqKm` and the citation behind the NWM US/DS formula | — |

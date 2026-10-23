@@ -576,7 +576,7 @@ $(function() {
     });
 
     $('#save-confirm-footer').on('click', function() {
-        $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId, verification_reason: $('#verification-reason').val(), verification_comment: verification_comment_value()}, function(data){
+        $.post(SAVE_URL, { nwm_kge: nwm_kge, geo_kge: geo_kge, nwm_kge_length: nwm_kge_length, geo_kge_length: geo_kge_length, nwm_id: staged_nwm, geo_id: staged_geoglows, usgs_id: selectedUsgsId, nwm_verification_reason: verification_reason_value('nwm'), nwm_verification_comment: verification_comment_value('nwm'), geoglows_verification_reason: verification_reason_value('geoglows'), geoglows_verification_comment: verification_comment_value('geoglows')}, function(data){
             if ("Error" in data){
                 nwm_kge = null;
                 geo_kge = null;
@@ -631,33 +631,46 @@ $(function() {
     })
 
     // --- Verification reason -----------------------------------------------
-    // Required in the Save and Verify popup. The confirm button is enabled only
-    // once the KGE request has finished AND a valid reason is chosen ("Other"
-    // also needs typed text). The server checks the reason again.
+    // Required in the Save and Verify popup, one reason per model (the NWM and
+    // GEOGLOWS reaches are judged separately). The confirm button is enabled
+    // only once the KGE request has finished AND both models have a valid
+    // reason ("Other" also needs typed text). The server checks both again.
     var save_kge_ready = false;
+    var VERIFICATION_MODELS = ['geoglows', 'nwm'];
 
-    function verification_comment_value(){
-        return ($('#verification-reason').val() === 'Other') ? $('#verification-comment').val().trim() : '';
+    function verification_reason_value(model){
+        return $('#verification-reason-' + model).val();
+    }
+
+    function verification_comment_value(model){
+        return (verification_reason_value(model) === 'Other') ? $('#verification-comment-' + model).val().trim() : '';
     }
 
     function reset_verification_reason(){
         save_kge_ready = false;
-        $('#verification-reason').val('');
-        $('#verification-comment').val('');
+        VERIFICATION_MODELS.forEach(function(model){
+            $('#verification-reason-' + model).val('');
+            $('#verification-comment-' + model).val('');
+        });
         update_verification_reason();
     }
 
     function update_verification_reason(){
-        var reason = $('#verification-reason').val();
-        var is_other = (reason === 'Other');
-        $('#verification-other').toggle(is_other);
-        $('#verification-comment-count').text($('#verification-comment').val().length);
-        var valid = (reason !== '') && (!is_other || verification_comment_value() !== '');
-        $('#save-confirm-footer').prop('disabled', !(save_kge_ready && valid));
+        var all_valid = true;
+        VERIFICATION_MODELS.forEach(function(model){
+            var reason = verification_reason_value(model);
+            var is_other = (reason === 'Other');
+            $('#verification-other-' + model).toggle(is_other);
+            $('#verification-comment-count-' + model).text($('#verification-comment-' + model).val().length);
+            if (reason === '' || (is_other && verification_comment_value(model) === '')){
+                all_valid = false;
+            }
+        });
+        $('#save-confirm-footer').prop('disabled', !(save_kge_ready && all_valid));
     }
 
-    $('#verification-reason').on('change', update_verification_reason);
-    $('#verification-comment').on('input', update_verification_reason);
+    $('.verification-reason').on('change', update_verification_reason);
+    $('.verification-comment').on('input', update_verification_reason);
 
     // --- Click handling ----------------------------------------------------
 
