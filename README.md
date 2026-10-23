@@ -96,7 +96,7 @@ Ensure that the map loads with gages (red, yellow, and green dots), blue stream 
 
 ## Usage
 A user verifies a gage through this process:
-1. Click on a red (unverified) gage -> see the gage + seeded reaches data on the right panel.
+1. Click on a red (unverified) gage -> see the gage + seeded reaches data on the right panel. To jump to a particular gage, type its USGS ID (with or without `USGS-`) or part of its name in the **Find a gage** box at the top-left of the map and pick it from the list.
 2. Inspect the reaches' locations on the map, relative to the gage, as well as the hydrograph and kge data mentioned above
 3. Test other reaches (if necessary) and find the best fit for this particular gage
 4. Type the corresponding IDs into the box above "Save and Verify", or pick the reaches off the map (recommended)

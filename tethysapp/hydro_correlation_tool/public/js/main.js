@@ -1342,5 +1342,196 @@ $(function() {
         $('#chart-single').removeClass('btn-primary').addClass('btn-outline-primary');
     })
 
+
+    // Gage search: a box over the top-left of the map that finds a gage by
+    // USGS ID or name. It searches the gage features already loaded for the
+    // map, so it needs no request, and opens a match through select_gage —
+    // the same path as clicking its dot.
+    var SEARCH_MAX_RESULTS = 10;
+    var search_matches = [];
+    var search_active = -1;
+
+    var search_input = document.createElement('input');
+    search_input.type = 'search';
+    search_input.className = 'form-control form-control-sm';
+    search_input.id = 'gage-search-input';
+    search_input.placeholder = 'Find a gage: USGS ID or name';
+    search_input.autocomplete = 'off';
+    search_input.setAttribute('aria-label', 'Find a gage by USGS ID or name');
+
+    var search_list = document.createElement('div');
+    search_list.className = 'gage-search-list';
+    search_list.setAttribute('role', 'listbox');
+
+    var search_element = document.createElement('div');
+    search_element.className = 'gage-search ol-unselectable ol-control';
+    search_element.appendChild(search_input);
+    search_element.appendChild(search_list);
+    ol_map.addControl(new ol.control.Control({ element: search_element }));
+
+    // "USGS-06934500", "usgs 06934500" and "06934500" all mean the same gage.
+    function search_id_part(text){
+        return text.replace(/^\s*usgs[\s\-_]*/i, '').trim();
+    }
+
+    function find_gages(query){
+        var q = query.trim();
+        if (!q) return [];
+        var id_q = search_id_part(q);
+        var by_id = /^\d+$/.test(id_q);
+        // Each typed word must start a word of the name, so "at" finds
+        // "Missouri River at ..." but not "Great Falls".
+        var words = q.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+        if (!by_id && words.length === 0) return [];
+        var ranked = [];
+        gage_source.getFeatures().forEach(function(feature){
+            var gage_id = search_id_part(String(feature.get('usgs_id') || ''));
+            var name = String(feature.get('gage_name') || '').toUpperCase();
+            var name_words = name.split(/[^A-Z0-9]+/);
+            var rank = null;
+            if (by_id){
+                if (gage_id === id_q) rank = 0;
+                else if (gage_id.startsWith(id_q)) rank = 1;
+                else if (gage_id.includes(id_q)) rank = 2;
+            } else if (words.every(function(w){ return name_words.some(function(t){ return t.startsWith(w); }); })){
+                rank = name.startsWith(words[0]) ? 3 : 4;
+            }
+            if (rank !== null) ranked.push({ rank: rank, feature: feature });
+        });
+        ranked.sort(function(a, b){
+            return a.rank - b.rank || String(a.feature.get('usgs_id')).localeCompare(String(b.feature.get('usgs_id')));
+        });
+        return ranked.slice(0, SEARCH_MAX_RESULTS).map(function(r){ return r.feature; });
+    }
+
+    function search_message(text){
+        search_matches = [];
+        search_active = -1;
+        search_list.innerHTML = '';
+        var note = document.createElement('div');
+        note.className = 'gage-search-note';
+        note.textContent = text;
+        search_list.appendChild(note);
+        search_list.style.display = 'block';
+    }
+
+    function close_search_list(){
+        search_matches = [];
+        search_active = -1;
+        search_list.innerHTML = '';
+        search_list.style.display = 'none';
+    }
+
+    function show_search_results(){
+        var q = search_input.value;
+        if (!q.trim()){
+            close_search_list();
+            return;
+        }
+        if (gage_source.getFeatures().length === 0){
+            search_message('Gages are still loading, try again in a moment.');
+            return;
+        }
+        search_matches = find_gages(q);
+        if (search_matches.length === 0){
+            search_message('No gage matches "' + q.trim() + '".');
+            return;
+        }
+        search_active = 0;
+        search_list.innerHTML = '';
+        search_matches.forEach(function(feature, i){
+            var status = feature.get('verification_status');
+            var row = document.createElement('div');
+            row.className = 'gage-search-item' + (i === search_active ? ' active' : '');
+            row.setAttribute('role', 'option');
+            row.title = status;
+            var dot = document.createElement('span');
+            dot.className = 'gage-search-dot';
+            dot.style.background = statusColors[status] || statusColors['Unverified'];
+            var id = document.createElement('span');
+            id.className = 'gage-search-id';
+            id.textContent = feature.get('usgs_id');
+            var name = document.createElement('span');
+            name.className = 'gage-search-name';
+            name.textContent = feature.get('gage_name');
+            row.appendChild(dot);
+            row.appendChild(id);
+            row.appendChild(name);
+            // mousedown, not click: it fires before the input loses focus.
+            row.addEventListener('mousedown', function(e){
+                e.preventDefault();
+                open_search_match(i);
+            });
+            search_list.appendChild(row);
+        });
+        search_list.style.display = 'block';
+    }
+
+    function highlight_search_match(i){
+        var rows = search_list.querySelectorAll('.gage-search-item');
+        if (rows.length === 0) return;
+        search_active = (i + rows.length) % rows.length;
+        rows.forEach(function(row, j){ row.classList.toggle('active', j === search_active); });
+        rows[search_active].scrollIntoView({ block: 'nearest' });
+    }
+
+    function open_search_match(i){
+        var feature = search_matches[i];
+        if (!feature) return;
+        var status = feature.get('verification_status');
+        search_input.value = feature.get('usgs_id');
+        close_search_list();
+        document.getElementById('nwm-id-input').classList.remove('is-invalid');
+        document.getElementById('geo-id-input').classList.remove('is-invalid');
+        if (feature.get('usgs_id') === selectedUsgsId){
+            select_gage(feature, true);
+        } else {
+            select_gage(feature);
+        }
+        if (!shown_statuses.includes(status)){
+            search_message(status + ' gages are hidden by the legend filter, so this dot is not drawn.');
+        }
+    }
+
+    search_input.addEventListener('input', show_search_results);
+    search_input.addEventListener('focus', show_search_results);
+    search_input.addEventListener('blur', close_search_list);
+    search_input.addEventListener('keydown', function(e){
+        // Keep typing (arrows, +, -) from also panning or zooming the map.
+        e.stopPropagation();
+        if (e.key === 'ArrowDown'){
+            e.preventDefault();
+            highlight_search_match(search_active + 1);
+        } else if (e.key === 'ArrowUp'){
+            e.preventDefault();
+            highlight_search_match(search_active - 1);
+        } else if (e.key === 'Enter'){
+            e.preventDefault();
+            if (search_matches.length === 0) show_search_results();
+            open_search_match(Math.max(search_active, 0));
+        } else if (e.key === 'Escape'){
+            close_search_list();
+            search_input.blur();
+        }
+    });
+    // Sit just right of Tethys's basemap (layers) button, measured on the page
+    // so it holds at any screen scaling or browser zoom. The CSS left is only
+    // the fallback for when the button is missing.
+    function place_search_box(){
+        var basemap = document.getElementById('basemap_dropdown_container');
+        if (!basemap) return;
+        var button_box = basemap.getBoundingClientRect();
+        if (button_box.width === 0) return;
+        var map_box = ol_map.getTargetElement().getBoundingClientRect();
+        search_element.style.left = Math.ceil(button_box.right - map_box.left + 8) + 'px';
+    }
+    place_search_box();
+    ol_map.once('rendercomplete', place_search_box);
+    window.addEventListener('resize', place_search_box);
+    // Results found before the gages finished loading are refreshed once they arrive.
+    gage_source.on('featuresloadend', function(){
+        if (document.activeElement === search_input) show_search_results();
+    });
+
 });
 

@@ -2,7 +2,7 @@
 
 How the Hydro Correlation Tool works, from the seeded IDs to the exported crosswalk CSV. **Keep this file up to date with every change to the app** and add a line to the [change log](#change-log).
 
-Green boxes marked **NEW** were added on the `add-DA-Analysis` branch (DA Analysis and the Save and Verify reason, 2026-10-20).
+Green boxes marked **NEW** were added on the `add-DA-Analysis` branch (DA Analysis and the Save and Verify reason, 2026-10-20; gage search, 2026-10-23).
 
 ```mermaid
 flowchart TD
@@ -21,6 +21,8 @@ flowchart TD
 
     DB --> MAP["Map loads gages<br/>db_get_gage → GeoJSON<br/>unreachable gages greyed out"]
     MAP --> CLICK["User clicks a gage<br/>seeded NWM + GEOGLOWS IDs staged"]
+    MAP --> SEARCH["NEW · Find a gage box (top-left of the map)<br/>USGS ID or name, searched in the loaded gages<br/>main.js find_gages"]
+    SEARCH -- "opens the match like a click (select_gage)" --> CLICK
     CLICK -. "user may pick other reaches on the map" .-> CLICK
 
     CLICK --> USGS["USGS daily discharge<br/>get_gage_info · dataretrieval"]
@@ -55,7 +57,7 @@ flowchart TD
     VCOLS --> CSV["reach_id_crosswalk_TIMESTAMP_UTC.csv"]
 
     classDef new fill:#d4edda,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
-    class DAPRE,DAREF,DA,USGSDA,DAPILLS,DACOLS,REASON,VLOG,VCOLS new;
+    class DAPRE,DAREF,DA,USGSDA,DAPILLS,DACOLS,REASON,VLOG,VCOLS,SEARCH new;
 ```
 
 ## Steps
@@ -67,6 +69,7 @@ flowchart TD
 | Load cache (optional) | `preprocessing/cache_loader_notebook.ipynb` | HydroShare parquet | `retrospective_cache` |
 | **NEW** Pre-download DA tables | `fetchers.py` `ensure_da_reference_tables` | NHDPlusV2 VAA, GEOGLOWS v2 model table | App workspace `da_reference/` |
 | Map | `controllers.py` `db_get_gage`, `main.js` | `gage_mapping`, `unreachable_gages.csv` | — |
+| **NEW** Find a gage | `main.js` gage search control (`find_gages`, `open_search_match`), `main.css` | Gage features already loaded for the map | — (opens the gage with `select_gage`) |
 | Fetch series | `controllers.py` `get_gage_info` / `get_reach_info`, `fetchers.py` | Cache first, then USGS / NWM API / GEOGLOWS S3 | `retrospective_cache` (temporary errors are not cached) |
 | KGE | `controllers.py` `compute_kge` | `retrospective_cache` | — (recalculated every time) |
 | **NEW** DA Analysis | `controllers.py` `da_analysis`, `da_analysis.py`, `main.js` `display_da` | `usgs_drainage_area` (USGS API on a miss), DA reference tables | `usgs_drainage_area` |
@@ -125,6 +128,15 @@ The Save and Verify popup also shows `GEOGLOWS DA ratio` / `NWM DA ratio` under 
 **Export.** All existing columns stay in the same order; these are appended, computed from the IDs saved on each row:
 `usgs_da_km2, nwm_da_us_km2, nwm_da_ds_km2, nwm_da_ratio, nwm_da_class, geoglows_da_us_km2, geoglows_da_ds_km2, geoglows_da_ratio, geoglows_da_class`
 
+## Find a gage (new)
+
+A search box over the top-left of the map, to the right of the zoom buttons and the basemap (layers) button. It searches the ~9,100 gages that are already loaded for the map, so it sends no request to the server.
+
+- **By ID:** `06934500`, `USGS-06934500` and `usgs 06934500` are the same search. Part of an ID also works (`069345`). Exact matches come first, then IDs that start with the digits, then IDs that contain them.
+- **By name:** every typed word must start a word of the gage name, upper or lower case (`missouri river at` finds "Missouri River at Hermann" but not "... near Great Falls"). Names that start with the first word come first.
+- Up to 10 matches are listed, each with a dot in its status colour. Click one, or use the arrow keys and **Enter** (Enter alone takes the top match). **Esc** closes the list.
+- The chosen gage opens through `select_gage`, exactly like clicking its dot: the map flies to it and the panel, hydrograph, KGE and DA load as usual. If that status is hidden by the legend filter, the gage still opens and a note says its dot is not drawn.
+
 ## Verification reason (new)
 
 The NWM and GEOGLOWS reaches are judged separately, so the Save popup asks for a reason **for each model**: a "Reason for verifying GEOGLOWS" and a "Reason for verifying NWM" dropdown (in the same order as the popup's KGE and DA lines). Both are **required** before **Save and verify** can be clicked. The choices are in `model.py` `VERIFICATION_REASONS`, which `home.html` uses to draw both dropdowns, so the dropdowns and the server check always match:
@@ -146,4 +158,5 @@ The button stays disabled until KGE has loaded **and** both models have a valid 
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
 | 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |
 | 2026-10-23 | The verification reason is now asked per model (NWM and GEOGLOWS): two required dropdowns, 4 reason/comment columns in `verification_log` and in the export | Reason for verifying, verification_log, append_verification_columns |
+| 2026-10-23 | Added a "Find a gage" search box (USGS ID or name) over the top-left of the map | Find a gage |
 | 2026-10-23 | Documentation only: added the NHDPlusV2 User Guide definitions of `AreaSqKm` / `TotDASqKm` and the citation behind the NWM US/DS formula | — |
