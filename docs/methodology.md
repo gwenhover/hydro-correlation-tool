@@ -42,9 +42,9 @@ flowchart TD
 
     KGEPILLS --> SAVEPOP["Save popup: KGE for the staged IDs<br/>NEW: NWM / GEOGLOWS DA ratio for the staged IDs"]
     DA --> SAVEPOP
-    SAVEPOP --> REASON["NEW · Reason for verifying, one per model (required)<br/>GEOGLOWS and NWM, each: Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · Other + typed comment"]
+    SAVEPOP --> REASON["NEW · Reason for verifying, one per model (required)<br/>GEOGLOWS and NWM, each: Matched KGE only · Matched DA only · Matched both KGE and DA<br/>Visual match · No matching reach (only when that ID is empty) · Other + typed comment"]
     DAPILLS -. "advisory only, never blocks Save" .-> REASON
-    REASON --> SAVE["Save and Verify<br/>Verified if both IDs = seed, else Edited<br/>stores IDs + KGE in gage_mapping<br/>NEW: refused without a valid reason"]
+    REASON --> SAVE["Save and Verify<br/>Verified if both IDs = seed, else Edited<br/>stores IDs + KGE in gage_mapping<br/>NEW: refused without a valid reason<br/>NEW: an empty ID is saved only with 'No matching reach'"]
     SAVE --> DB
     SAVE --> VLOG[("NEW · verification_log table<br/>one row per save: NWM + GEOGLOWS reason and comment, user, time")]
 
@@ -145,9 +145,20 @@ The NWM and GEOGLOWS reaches are judged separately, so the Save popup asks for a
 - Matched DA only
 - Matched both KGE and DA
 - Visual match (map location / hydrograph)
+- No matching reach: offered only when that model's ID box is empty (see below)
 - Other: a text box appears under that model's dropdown and must be filled in (up to 500 characters)
 
 The button stays disabled until KGE has loaded **and** both models have a valid reason. The server checks each model's reason again (`clean_verification_reason`, once per model) and refuses the save if either is missing. A comment is kept only where that model's reason is "Other". A `verification_log` left by the earlier single-reason version (one required `reason`/`comment`) is upgraded the first time it is used: `upgrade_verification_log_table` adds the four per-model columns and makes the old `reason` optional, keeping old rows unchanged. Each save adds a row to `verification_log` (usgs_id, saved IDs, status, `nwm_reason`, `nwm_comment`, `geoglows_reason`, `geoglows_comment`, username, timestamp) in the same transaction as the `gage_mapping` update, so a re-verified gage keeps its full history. The export appends `nwm_verification_reason`, `nwm_verification_comment`, `geoglows_verification_reason` and `geoglows_verification_comment` from each gage's **latest** save; gages not saved since this feature was added are blank.
+
+## No matching reach (new)
+
+Some gages have no reach in one model, or in either (in the seed, 1,511 gages have no NWM ID, 476 no GEOGLOWS ID and 146 neither). Before this change such a gage could never be saved, because Save and Verify needed both IDs. Now:
+
+- **Leave that model's ID box empty** and click Save and Verify. This is accepted only when **no reach of that model is selected**; if a seeded or picked reach is loaded, the usual "DID NOT SAVE AND VERIFY" message still asks the curator to confirm it (`staged_matches_selected` in `main.js`). Pressing **Enter on an empty box** drops that model's selected reach (`clear_reach_selection`), for when the seeded reach is wrong and no right one exists.
+- In the popup, that model shows **"ID: none"** and **"KGE: N/A (no reach)"**, and its dropdown offers only **"No matching reach"**; a model with an ID offers every reason except that one (`show_no_match_models`).
+- The server enforces the pairing (`model.clean_reach_id`): an empty ID only with "No matching reach", and "No matching reach" only with an empty ID. The ID is stored as empty (NULL) in `gage_mapping` and `verification_log`.
+- **Status** (`model.same_reach`): an empty saved ID matches a seed that also had none. So a gage is **Verified** when every saved ID, empty or not, equals its seed, and **Edited** otherwise (for example a seeded reach removed, or a reach picked where the seed had none).
+- **Export:** unchanged columns. The ID stays blank; `verification_status` (Verified/Edited instead of Unverified) and the reason "No matching reach" tell "checked, no reach exists" apart from "never reviewed". KGE and DA for that model are blank / NO DATA.
 
 ## Change log
 
@@ -158,6 +169,7 @@ The button stays disabled until KGE has loaded **and** both models have a valid 
 | 2026-10-20 | Added a required reason for verifying (dropdown + "Other" text) to the Save popup, logged in `verification_log` and exported as 2 columns | Reason for verifying, Save and Verify, verification_log, append_verification_columns |
 | 2026-10-21 | DA ratios (NWM and GEOGLOWS) also shown in the Save and Verify popup, for the staged IDs | Save popup |
 | 2026-10-23 | The verification reason is now asked per model (NWM and GEOGLOWS): two required dropdowns, 4 reason/comment columns in `verification_log` and in the export | Reason for verifying, verification_log, append_verification_columns |
+| 2026-10-26 | "No matching reach": a model with no reach can be saved with an empty ID and that reason; the server enforces the pairing and the status rule counts an empty ID as matching an empty seed | Reason for verifying, Save and Verify |
 | 2026-10-23 | Review fix (PR #38): the upgrade uses `ADD COLUMN IF NOT EXISTS`, so two app pods running it at the same moment don't error | verification_log |
 | 2026-10-23 | `verification_log` created by the single-reason version is upgraded on first use (`upgrade_verification_log_table`): the 4 per-model columns are added and the old `reason` becomes optional; old rows are kept | verification_log |
 | 2026-10-23 | Added a "Find a gage" search box (USGS ID or name) over the top-left of the map | Find a gage |

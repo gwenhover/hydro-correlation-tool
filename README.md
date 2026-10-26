@@ -102,6 +102,7 @@ A user verifies a gage through this process:
 4. Type the corresponding IDs into the box above "Save and Verify", or pick the reaches off the map (recommended)
 5. Click "Save and Verify"
    - Choose a reason for verifying **each model**, GEOGLOWS and NWM (both required): Matched KGE only, Matched DA only, Matched both KGE and DA, Visual match (map location / hydrograph), or Other (type why). The reasons are logged with your username and exported.
+   - If a model has **no matching reach** for this gage, leave its ID box empty (press Enter on the empty box to drop a wrong seeded reach). The popup then shows "none" for that model and asks for the reason "No matching reach".
 6. Confirm
 7. Move to the next gage
 

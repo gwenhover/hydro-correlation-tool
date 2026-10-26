@@ -417,6 +417,9 @@ $(function() {
                 document.getElementById('nwm-id-feedback').textContent = 'Select a gage first.';
                 this.classList.add('is-invalid')
                 return;
+            } else if (nwm_logged === '') {
+                clear_reach_selection('NWM');
+                return;
             } else if (!/^\d+$/.test(nwm_logged)) {
                 this.classList.add('is-invalid')
                 document.getElementById('nwm-id-feedback').textContent = 'Reach IDs are numbers only.';
@@ -447,6 +450,9 @@ $(function() {
                 document.getElementById('geo-id-feedback').textContent = 'Select a gage first.';
                 this.classList.add('is-invalid')
                 return;
+            } else if (geo_logged === '') {
+                clear_reach_selection('GEOGLOWS');
+                return;
             } else if (!/^\d+$/.test(geo_logged)) {
                 document.getElementById('geo-id-feedback').textContent = 'Reach IDs are numbers only.';
                 this.classList.add('is-invalid')
@@ -471,12 +477,12 @@ $(function() {
     $('#save-and-verify').on('click', function() {
         staged_nwm = nwmInput.value.trim();
         staged_geoglows = geoInput.value.trim();
-        if (!staged_geoglows|| !staged_nwm|| !selectedUsgsId){
+        if (!selectedUsgsId){
             const modalEl = document.getElementById("unstaged-modal");
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
             return
         }
-        if (staged_nwm !== String(selectedNwmId) || staged_geoglows !== String(selectedGeoglowsId)){
+        if (!staged_matches_selected(staged_nwm, selectedNwmId) || !staged_matches_selected(staged_geoglows, selectedGeoglowsId)){
             const unsavedModalEl = document.getElementById("non-selected-modal");
             bootstrap.Modal.getOrCreateInstance(unsavedModalEl).show();
             return
@@ -492,6 +498,7 @@ $(function() {
         $("#usgs-id").text("    USGS ID: " + selectedUsgsId);
         $("#geo-id").text( "GEOGLOWS ID: " + staged_geoglows);
         $("#nwm-id").text( "     NWM ID: " + staged_nwm);
+        show_no_match_models(staged_geoglows, staged_nwm);
         $("#geo-kge").text("GEOGLOWS KGE Loading");
         $("#nwm-kge").text("NWM KGE Loading");
 
@@ -557,6 +564,7 @@ $(function() {
             update_verification_reason();
             $("#geo-kge").text("GEOGLOWS KGE: " + geo_kge_text).css("color", geo_color);
             $("#nwm-kge").text("     NWM KGE: " + nwm_kge_text).css("color", nwm_color);
+            show_no_match_kge(staged_geoglows, staged_nwm);
             
         }).fail(function(){
             if (modalEl.classList.contains('show')) {
@@ -671,6 +679,59 @@ $(function() {
 
     $('.verification-reason').on('change', update_verification_reason);
     $('.verification-comment').on('input', update_verification_reason);
+
+    // --- No matching reach ---------------------------------------------------
+    // Some gages have no reach in one model (or either). Such a model is saved
+    // with an empty ID box, and its reason must be "No matching reach"
+    // (model.VERIFICATION_NO_MATCH); the server enforces the same pairing.
+    var NO_MATCH_REASON = 'No matching reach';
+
+    // An empty box is only accepted when no reach of that model is selected,
+    // so a loaded seed the curator forgot to confirm is still caught.
+    function staged_matches_selected(staged_id, selected_id){
+        if (staged_id === ''){
+            return selected_id === null || selected_id === undefined || selected_id === '';
+        }
+        return staged_id === String(selected_id);
+    }
+
+    // Enter on an empty ID box drops that model's selected reach, for when the
+    // seeded reach is wrong and no right one exists.
+    function clear_reach_selection(network){
+        if (network === 'NWM'){
+            selectedNwmId = null;
+            nwm_layer.changed();
+        } else {
+            selectedGeoglowsId = null;
+            geoglows_layer.changed();
+        }
+        delete series_state[network.toLowerCase()];
+        $('.reach-row-' + network.toLowerCase()).remove();
+        render_hydrograph();
+        display_kge(selectedNwmId, selectedGeoglowsId, selectedUsgsId);
+    }
+
+    // Save popup: a model with no ID shows "none" and offers only
+    // "No matching reach"; a model with an ID offers every reason but that one.
+    function show_no_match_models(geo_id, nwm_id){
+        var staged = { 'geoglows': geo_id, 'nwm': nwm_id };
+        if (!geo_id) $("#geo-id").text("GEOGLOWS ID: none");
+        if (!nwm_id) $("#nwm-id").text("     NWM ID: none");
+        VERIFICATION_MODELS.forEach(function(model){
+            var no_reach = !staged[model];
+            $('#verification-reason-' + model + ' option').each(function(){
+                if (this.value === '') return;
+                var allowed = no_reach ? (this.value === NO_MATCH_REASON) : (this.value !== NO_MATCH_REASON);
+                this.disabled = !allowed;
+                this.hidden = !allowed;
+            });
+        });
+    }
+
+    function show_no_match_kge(geo_id, nwm_id){
+        if (!geo_id) $("#geo-kge").text("GEOGLOWS KGE: N/A (no reach)").css("color", "");
+        if (!nwm_id) $("#nwm-kge").text("     NWM KGE: N/A (no reach)").css("color", "");
+    }
 
     // --- Click handling ----------------------------------------------------
 

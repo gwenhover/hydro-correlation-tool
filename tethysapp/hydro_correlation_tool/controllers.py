@@ -18,6 +18,7 @@ from .model import UsgsDrainageArea
 from .da_analysis import build_da_columns, da_result, nwm_us_ds, geoglows_us_ds, sq_mi_to_km2
 from .model import VerificationLog, VERIFICATION_REASONS, clean_verification_reason
 from sqlalchemy import inspect, text
+from .model import clean_reach_id, same_reach
 start_date = '2018-01-01'
 end_date = '2022-12-31'
 
@@ -158,8 +159,8 @@ def save_and_verify(request):
     Session = sessionmaker(bind=Engine)
     session = Session() 
     try:
-        nwm_final  = int((request.POST.get('nwm_id')))
-        geo_final  = int((request.POST.get('geo_id')))
+        nwm_raw = request.POST.get('nwm_id')
+        geo_raw = request.POST.get('geo_id')
         usgs_final = (request.POST.get('usgs_id')).removeprefix("USGS-")
         nwm_kge = (request.POST.get('nwm_kge'))
         geo_kge = (request.POST.get('geo_kge'))
@@ -186,12 +187,17 @@ def save_and_verify(request):
         if nwm_reason is None or geo_reason is None:
             print("ERROR: Could not save or validate\nCode: missing or invalid NWM/GEOGLOWS verification reason")
             return JsonResponse({"Error": "Could not save or validate"})
+        nwm_ok, nwm_final = clean_reach_id(nwm_raw, nwm_reason)
+        geo_ok, geo_final = clean_reach_id(geo_raw, geo_reason)
+        if not (nwm_ok and geo_ok):
+            print("ERROR: Could not save or validate\nCode: reach ID does not fit its reason (empty ID needs 'No matching reach')")
+            return JsonResponse({"Error": "Could not save or validate"})
         ensure_verification_log_table(Engine)
         new_row = session.get(hctTable, f"USGS-{usgs_final}")
         if new_row is None:
             print("ERROR: Could not save or validate")
             return JsonResponse({"Error": "Could not save or validate"})
-        if new_row.seeded_nwm_feature_id is not None and new_row.seeded_geoglows_river_id is not None and int(new_row.seeded_nwm_feature_id) == nwm_final and int(new_row.seeded_geoglows_river_id) == geo_final:
+        if same_reach(new_row.seeded_nwm_feature_id, nwm_final) and same_reach(new_row.seeded_geoglows_river_id, geo_final):
             new_row.verification_status = 'Verified'
             new_row.nwm_feature_id = nwm_final
             new_row.geoglows_river_id = geo_final

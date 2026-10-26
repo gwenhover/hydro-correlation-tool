@@ -112,11 +112,13 @@ class UsgsDrainageArea(Base):
 # model (NWM and GEOGLOWS). home.html renders this list, so the dropdowns and
 # the server check can't drift apart.
 VERIFICATION_OTHER = 'Other'
+VERIFICATION_NO_MATCH = 'No matching reach'
 VERIFICATION_REASONS = (
     'Matched KGE only',
     'Matched DA only',
     'Matched both KGE and DA',
     'Visual match (map location / hydrograph)',
+    VERIFICATION_NO_MATCH,
     VERIFICATION_OTHER,
 )
 VERIFICATION_COMMENT_MAX = 500
@@ -136,6 +138,28 @@ def clean_verification_reason(reason, comment):
     if not comment or len(comment) > VERIFICATION_COMMENT_MAX:
         return None, None
     return reason, comment
+
+
+def clean_reach_id(raw_id, reason):
+    # Checks one model's saved reach ID against that model's (already
+    # cleaned) reason. Returns (ok, reach_id). A model with no matching reach
+    # is saved with an empty ID, which is only accepted with the reason
+    # "No matching reach" -- and that reason only with an empty ID.
+    raw_id = str(raw_id or '').strip()
+    if reason == VERIFICATION_NO_MATCH:
+        return (raw_id == ''), None
+    try:
+        return True, int(raw_id)
+    except ValueError:
+        return False, None
+
+
+def same_reach(seeded_id, saved_id):
+    # True when a saved ID agrees with the seed; "no reach" agrees only with
+    # a seed that had no reach either.
+    if seeded_id is None or saved_id is None:
+        return seeded_id is None and saved_id is None
+    return int(seeded_id) == int(saved_id)
 
 
 class VerificationLog(Base):
