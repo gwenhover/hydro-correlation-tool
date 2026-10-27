@@ -96,12 +96,13 @@ Ensure that the map loads with gages (red, yellow, and green dots), blue stream 
 
 ## Usage
 A user verifies a gage through this process:
-1. Click on a red (unverified) gage -> see the gage + seeded reaches data on the right panel.
+1. Click on a red (unverified) gage -> see the gage + seeded reaches data on the right panel. To jump to a particular gage, type its USGS ID (with or without `USGS-`) or part of its name in the **Find a gage** box at the top-left of the map and pick it from the list.
 2. Inspect the reaches' locations on the map, relative to the gage, as well as the hydrograph and kge data mentioned above
 3. Test other reaches (if necessary) and find the best fit for this particular gage
 4. Type the corresponding IDs into the box above "Save and Verify", or pick the reaches off the map (recommended)
 5. Click "Save and Verify"
-   - Choose a reason for verifying (required): Matched KGE only, Matched DA only, Matched both KGE and DA, Visual match (map location / hydrograph), or Other (type why). The reason is logged with your username and exported.
+   - Choose a reason for verifying **each model**, GEOGLOWS and NWM (both required): Matched KGE only, Matched DA only, Matched both KGE and DA, Visual match (map location / hydrograph), or Other (type why). The reasons are logged with your username and exported.
+   - If a model has **no matching reach** for this gage, leave its ID box empty (press Enter on the empty box to drop a wrong seeded reach). The popup then shows "none" for that model and asks for the reason "No matching reach".
 6. Confirm
 7. Move to the next gage
 
@@ -147,7 +148,7 @@ An example row looks like:
 
 The exported CSV also appends 9 DA Analysis columns, computed from the saved IDs on each row: `usgs_da_km2, nwm_da_us_km2, nwm_da_ds_km2, nwm_da_ratio, nwm_da_class, geoglows_da_us_km2, geoglows_da_ds_km2, geoglows_da_ratio, geoglows_da_class`. The first export fetches USGS drainage areas for every gage (about 20 s); later exports use the cache.
 
-After those, `verification_reason` and `verification_comment` give the reason chosen at each gage's latest Save and Verify (blank for gages not saved since reasons were added). The full history of every save is kept in the `verification_log` table.
+After those, `nwm_verification_reason`, `nwm_verification_comment`, `geoglows_verification_reason` and `geoglows_verification_comment` give the reasons chosen for each model at each gage's latest Save and Verify (blank for gages not saved since reasons were added). The full history of every save is kept in the `verification_log` table.
 
 ## Known bugs and future work
 

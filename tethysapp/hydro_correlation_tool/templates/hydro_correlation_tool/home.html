@@ -144,18 +144,20 @@
           <p id="nwm-kge"></p>
           <p id="geo-da"></p>
           <p id="nwm-da"></p>
-          {# Required: logged in verification_log with the save, and exported #}
-          <h6><strong>Reason for verifying</strong> <span class="text-danger">*</span></h6>
-          <select class="form-select mb-2" id="verification-reason" aria-label="Reason for verifying">
+          {# Required, one per model: logged in verification_log with the save, and exported #}
+          {% for model_key, model_label in verification_models %}
+          <h6><strong>Reason for verifying {{ model_label }}</strong> <span class="text-danger">*</span></h6>
+          <select class="form-select mb-2 verification-reason" id="verification-reason-{{ model_key }}" data-model="{{ model_key }}" aria-label="Reason for verifying {{ model_label }}">
             <option value="" selected>Choose a reason…</option>
             {% for reason in verification_reasons %}
             <option value="{{ reason }}">{{ reason }}</option>
             {% endfor %}
           </select>
-          <div id="verification-other" class="mb-3" style="display: none;">
-            <textarea class="form-control" id="verification-comment" rows="2" maxlength="500" placeholder="Please describe why you are verifying these reaches..."></textarea>
-            <div class="form-text text-end"><span id="verification-comment-count">0</span>/500</div>
+          <div id="verification-other-{{ model_key }}" class="mb-3" style="display: none;">
+            <textarea class="form-control verification-comment" id="verification-comment-{{ model_key }}" data-model="{{ model_key }}" rows="2" maxlength="500" placeholder="Please describe why you are verifying this {{ model_label }} reach..."></textarea>
+            <div class="form-text text-end"><span id="verification-comment-count-{{ model_key }}">0</span>/500</div>
           </div>
+          {% endfor %}
           <h6><strong>Hydrograph</strong></h6>
           <div id="hydro-modal"></div>
         </div>
